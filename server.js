@@ -1,4 +1,3 @@
-
 const express = require('express');
 const path = require('path');
 const cors = require('cors');
@@ -6,7 +5,8 @@ const esbuild = require('esbuild');
 const fs = require('fs');
 
 const app = express();
-const PORT = process.env.PORT || 3000;
+// Cloud Run setzt die Umgebungsvariable PORT (meist 8080)
+const PORT = process.env.PORT || 8080;
 const CONFIG_FILE = path.join(__dirname, 'config.json');
 
 app.use(cors());
@@ -29,7 +29,11 @@ const readConfig = () => {
             sessionDurationMinutes: 15
         };
     }
-    return JSON.parse(fs.readFileSync(CONFIG_FILE, 'utf8'));
+    try {
+        return JSON.parse(fs.readFileSync(CONFIG_FILE, 'utf8'));
+    } catch (e) {
+        return { useMock: true, rooms: [] };
+    }
 };
 
 app.get('/api/config', (req, res) => res.json(readConfig()));
@@ -43,7 +47,6 @@ app.post('/api/config', (req, res) => {
     }
 });
 
-// Proxy-Logik ohne http-proxy-middleware zur Vermeidung von Memory Leaks
 app.get('/api/proxy', async (req, res) => {
     const targetUrl = req.query.url;
     if (!targetUrl) return res.status(400).send('Missing url');
@@ -54,7 +57,6 @@ app.get('/api/proxy', async (req, res) => {
             headers: {}
         };
 
-        // Header vom Client (z.B. Authorization) weitergeben
         if (req.headers.authorization) {
             fetchOptions.headers['Authorization'] = req.headers.authorization;
         }
@@ -97,6 +99,7 @@ app.use(express.static(__dirname));
 
 app.get('*', (req, res) => res.sendFile(path.join(__dirname, 'index.html')));
 
-app.listen(PORT, () => {
-    console.log(`TEKKO Server running on http://localhost:${PORT}`);
+// Cloud Run erfordert das Binden an 0.0.0.0
+app.listen(PORT, '0.0.0.0', () => {
+    console.log(`TEKKO Server is listening on 0.0.0.0:${PORT}`);
 });

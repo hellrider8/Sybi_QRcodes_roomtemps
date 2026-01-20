@@ -5,8 +5,11 @@ npm-debug.log
 .env
 config.json
 Dockerfile
+dockerfile.txt
 .dockerignore
 dist
 *.md
 .gitignore
 .gitignored
+out
+build
