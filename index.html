@@ -81,4 +81,33 @@
   <body>
     <div id="root"></div>
   </body>
+<script type="module">
+      import React from 'react';
+      import { createRoot } from 'react-dom/client';
+      // Hier importieren wir die Icons und QR-Komponenten von deiner Liste oben
+      import { Thermometer, Settings } from 'lucide-react'; 
+
+      function App() {
+        return (
+          <div className="flex flex-col items-center justify-center h-full p-4">
+            <div className="bg-white p-8 rounded-3xl shadow-2xl text-center w-full max-w-sm">
+              <h1 className="text-2xl font-bold text-gray-800 mb-4">TEKKO Regelung</h1>
+              <div className="flex justify-center mb-4">
+                 <Thermometer size={64} className="text-blue-500" />
+              </div>
+              <div className="text-6xl font-light text-gray-900 mb-2">22.5°C</div>
+              <p className="text-gray-500 uppercase tracking-widest text-sm">Wohnzimmer</p>
+              
+              <button className="mt-8 bg-gray-100 p-3 rounded-full hover:bg-gray-200 transition-colors">
+                <Settings className="text-gray-600" />
+              </button>
+            </div>
+          </div>
+        );
+      }
+
+      const root = createRoot(document.getElementById('root'));
+      root.render(<App />);
+    </script>
+  
 </html>
