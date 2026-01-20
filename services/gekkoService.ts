@@ -19,7 +19,10 @@ class GekkoService {
     secretKey: 'sybtec-static-access-key-2024',
     corsProxy: '',
     rooms: [],
-    sessionDurationMinutes: 15 // Standardwert
+    sessionDurationMinutes: 15,
+    minOffset: -3.0,
+    maxOffset: 3.0,
+    stepSize: 0.5
   };
 
   private currentRoomId: string = '';
@@ -42,8 +45,11 @@ class GekkoService {
     try {
       const response = await fetch('/api/config');
       if (response.ok) {
-        this.config = await response.json();
-        // Fallback für alte configs ohne das Feld
+        const loaded = await response.json();
+        this.config = { ...this.config, ...loaded };
+        if (this.config.minOffset === undefined) this.config.minOffset = -3.0;
+        if (this.config.maxOffset === undefined) this.config.maxOffset = 3.0;
+        if (this.config.stepSize === undefined) this.config.stepSize = 0.5;
         if (!this.config.sessionDurationMinutes) this.config.sessionDurationMinutes = 15;
       }
     } catch (e) {
@@ -74,10 +80,7 @@ class GekkoService {
   }
 
   generateToken(roomId: string): string {
-    const payload = JSON.stringify({
-      r: roomId,
-      s: this.config.secretKey
-    });
+    const payload = JSON.stringify({ r: roomId, s: this.config.secretKey });
     const base64 = btoa(payload);
     return base64.replace(/\+/g, '-').replace(/\//g, '_').replace(/=/g, '');
   }
@@ -86,15 +89,9 @@ class GekkoService {
     try {
       let base64 = token.replace(/-/g, '+').replace(/_/g, '/');
       while (base64.length % 4 !== 0) base64 += '=';
-      
       const decodedStr = atob(base64);
       const data = JSON.parse(decodedStr);
-      
-      if (data.s && data.s !== this.config.secretKey) {
-        this.logToServer('ERROR', 'Token-Schlüssel passt nicht zur Server-Config', { tokenKey: data.s });
-        return null;
-      }
-
+      if (data.s && data.s !== this.config.secretKey) return null;
       return { roomId: data.r };
     } catch (e: any) {
       this.logToServer('ERROR', 'Token Dekodierung fehlgeschlagen', { error: e.message });
@@ -109,26 +106,21 @@ class GekkoService {
   private getUrl(path: string, customQuery: string = '') {
     let baseUrl = '';
     let authParams = '';
-    
     if (this.config.apiMode === 'cloud') {
       baseUrl = `https://live.my-gekko.com/api/v1/var`;
       authParams = `username=${encodeURIComponent(this.config.username)}&key=${encodeURIComponent(this.config.password)}&gekkoid=${encodeURIComponent(this.config.gekkoId)}`;
     } else {
       baseUrl = `http://${this.config.ip}/api/v1/var`;
     }
-
     const cleanPath = path.startsWith('/') ? path : `/${path}`;
     let finalUrl = `${baseUrl}${cleanPath}`;
-    
     const queryParts: string[] = [];
     if (customQuery) queryParts.push(customQuery);
     if (this.config.apiMode === 'cloud') queryParts.push(authParams);
-
     if (queryParts.length > 0) {
       const connector = finalUrl.includes('?') ? '&' : '?';
       finalUrl += `${connector}${queryParts.join('&')}`;
     }
-    
     return `/api/proxy?url=${encodeURIComponent(finalUrl)}`;
   }
 
@@ -181,6 +173,10 @@ class GekkoService {
     }
   }
 
+  /**
+   * Holt den Status aller Räume über den Bulk-Endpunkt (/roomtemps/status)
+   * Dies ist schneller und effizienter bei mehreren Usern oder Räumen.
+   */
   async fetchStatus(roomId: string = this.currentRoomId): Promise<GekkoStatus> {
     const room = this.config.rooms.find(r => r.id === roomId);
     if (this.config.useMock) {
@@ -190,12 +186,19 @@ class GekkoService {
         feuchte: 50, roomName: room?.name || "Demo-Raum", category: "DEMO"
       };
     }
-    const url = this.getUrl(`/roomtemps/${roomId}/status`);
+
+    // Wir nutzen den Bulk-Status Endpunkt für alle Räume gleichzeitig
+    const url = this.getUrl('/roomtemps/status');
     const response = await fetch(url, this.getFetchOptions());
-    const data = await response.json();
-    const itemData = data[roomId] || data;
+    const allStatusData = await response.json();
+    
+    // Wir extrahieren die Daten für den spezifischen Raum aus dem Bulk-Objekt
+    const itemData = allStatusData[roomId];
+    if (!itemData) throw new Error(`Raum ${roomId} nicht im Status-Payload gefunden.`);
+
     const vals = (itemData.sumstate?.value || itemData.sumstate || "").split(';');
     this.lastRawStatus = itemData.sumstate?.value || itemData.sumstate || "";
+
     return {
       istTemp: parseFloat(vals[0]) || 0,
       sollTemp: parseFloat(vals[1]) || 0,

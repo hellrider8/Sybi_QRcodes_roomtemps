@@ -36,38 +36,38 @@ const Footer: React.FC<FooterProps> = ({ hauptMode, subMode, feuchte }) => {
             <span className="text-sm font-light tracking-wider mr-2">{feuchte.toFixed(1)} % rF</span>
           </div>
 
-          {/* Sybtec Branding mit Original Logo-SVG (Interlaced S) */}
-          <div className="pt-8 flex flex-col justify-center items-center gap-2">
-            <div className="flex items-center gap-3 opacity-90 hover:opacity-100 transition-opacity cursor-pointer">
-               <svg width="32" height="32" viewBox="0 0 100 100" xmlns="http://www.w3.org/2000/svg">
-                  {/* Purple Interlaced Path Style (The stylized S) */}
+          {/* Sybtec Branding mit echtem S-Logo */}
+          <div className="pt-8 flex justify-center items-center">
+            <a 
+              href="https://www.sybtec.de/" 
+              target="_blank" 
+              rel="noopener noreferrer"
+              className="flex items-center gap-4 group transition-opacity hover:opacity-100 opacity-90"
+            >
+              <div className="relative w-8 h-8">
+                <svg viewBox="0 0 100 120" className="w-full h-full drop-shadow-sm">
+                  {/* Purple Part of the S */}
                   <path 
-                    d="M20,30 C20,10 80,10 80,30 L80,45 C80,55 70,55 70,55 L30,55 C20,55 20,65 20,75 L20,90" 
+                    d="M30 110 L30 90 C30 70 50 70 50 70 L70 70 C85 70 85 50 85 50 C85 30 70 30 65 30 L40 30 C20 30 20 10 20 10 L20 0" 
                     fill="none" 
                     stroke="#4B0082" 
-                    strokeWidth="14" 
-                    strokeLinecap="round"
-                    strokeLinejoin="round"
+                    strokeWidth="18" 
+                    strokeLinecap="square"
                   />
-                  {/* Green Interlaced Path Style */}
+                  {/* Green Part of the S */}
                   <path 
-                    d="M80,10 L80,25 C80,35 70,35 70,35 L30,35 C20,35 20,45 20,55 L20,70 C20,90 80,90 80,70" 
+                    d="M70 10 L70 30 C70 50 50 50 50 50 L30 50 C15 50 15 70 15 70 C15 90 30 90 35 90 L60 90 C80 90 80 110 80 110 L80 120" 
                     fill="none" 
                     stroke="#76C74D" 
-                    strokeWidth="14" 
-                    strokeLinecap="round"
-                    strokeLinejoin="round"
+                    strokeWidth="18" 
+                    strokeLinecap="square"
                   />
-               </svg>
-               <a 
-                href="https://www.sybtec.de/" 
-                target="_blank" 
-                rel="noopener noreferrer"
-                className="text-[10px] text-white uppercase tracking-[0.4em] font-light"
-               >
+                </svg>
+              </div>
+              <span className="text-[10px] text-white uppercase tracking-[0.4em] font-light mt-1">
                 powered by sybtec
-               </a>
-            </div>
+              </span>
+            </a>
           </div>
 
         </div>

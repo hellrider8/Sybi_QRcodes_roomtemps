@@ -7,9 +7,10 @@ interface MainControlProps {
   offset: number;
   mode: string;
   onAdjust: (delta: number) => void;
+  stepSize?: number;
 }
 
-const MainControl: React.FC<MainControlProps> = ({ soll, ist, offset, mode, onAdjust }) => {
+const MainControl: React.FC<MainControlProps> = ({ soll, ist, offset, mode, onAdjust, stepSize = 0.5 }) => {
   const isBlocked = mode !== 'KOMFORT';
 
   return (
@@ -30,7 +31,7 @@ const MainControl: React.FC<MainControlProps> = ({ soll, ist, offset, mode, onAd
         {/* Buttons Row */}
         <div className="flex items-stretch h-14 gap-1 mt-4">
           <button 
-            onClick={() => !isBlocked && onAdjust(-0.5)}
+            onClick={() => !isBlocked && onAdjust(-stepSize)}
             disabled={isBlocked}
             className={`flex-1 bg-[#535353] text-white flex items-center justify-center text-3xl font-extralight transition-all border-r border-teal-600/20 ${
               isBlocked ? 'opacity-20 cursor-not-allowed grayscale' : 'hover:bg-[#404040] active:scale-95'
@@ -42,7 +43,7 @@ const MainControl: React.FC<MainControlProps> = ({ soll, ist, offset, mode, onAd
             {offset > 0 ? '+' : ''}{offset.toFixed(1)} °C
           </div>
           <button 
-            onClick={() => !isBlocked && onAdjust(0.5)}
+            onClick={() => !isBlocked && onAdjust(stepSize)}
             disabled={isBlocked}
             className={`flex-1 bg-[#535353] text-white flex items-center justify-center text-3xl font-extralight transition-all border-l border-teal-600/20 ${
               isBlocked ? 'opacity-20 cursor-not-allowed grayscale' : 'hover:bg-[#404040] active:scale-95'

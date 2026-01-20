@@ -1,6 +1,6 @@
 
 import React, { useState, useEffect } from 'react';
-import { Save, Plus, Trash2, X, Settings, Shield, RefreshCw, Globe, Wifi, Eye, AlertCircle, CheckCircle2, Terminal, Copy, Server, Activity, Search, Hash, QrCode as QrIcon, Lock, Clock, Download, FileArchive } from 'lucide-react';
+import { Save, Plus, Trash2, X, Settings, Shield, RefreshCw, Globe, Wifi, Eye, AlertCircle, CheckCircle2, Terminal, Copy, Server, Activity, Search, Hash, QrCode as QrIcon, Lock, Clock, Download, FileArchive, SlidersHorizontal } from 'lucide-react';
 import { gekkoService } from '../services/gekkoService.ts';
 import { RoomDefinition } from '../types.ts';
 import { QRCodeCanvas } from 'qrcode.react';
@@ -129,7 +129,7 @@ const AdminPanel: React.FC<AdminPanelProps> = ({ onClose, onPreviewRoom }) => {
           {id: 'api', label: 'Verbindung'},
           {id: 'rooms', label: 'Räume'},
           {id: 'export', label: 'QR-Codes'},
-          {id: 'hosting', label: 'Sicherheit'}
+          {id: 'hosting', label: 'System & Sicherheit'}
         ].map(tab => (
           <button 
             key={tab.id}
@@ -253,6 +253,51 @@ const AdminPanel: React.FC<AdminPanelProps> = ({ onClose, onPreviewRoom }) => {
         {activeTab === 'hosting' && (
           <div className="max-w-md mx-auto space-y-6">
             <div className="bg-white p-6 rounded-2xl border shadow-sm">
+               <h3 className="font-bold text-sm mb-4 uppercase flex items-center gap-2 text-[#00828c]"><SlidersHorizontal size={16}/> Regelungsparameter</h3>
+               <p className="text-[10px] text-slate-400 mb-4 leading-relaxed">
+                 Einstellungen für die Temperatur-Anpassung (+/- Tasten). Gilt für alle Räume.
+               </p>
+               <div className="space-y-4">
+                 <div>
+                   <label className="text-[9px] font-bold uppercase text-slate-400 block mb-1">Anpassungsbereich (Min / Max in °C)</label>
+                   <div className="grid grid-cols-2 gap-3">
+                     <div className="relative">
+                       <span className="absolute left-3 top-2.5 text-slate-400 text-xs font-bold">MIN</span>
+                       <input 
+                        type="number" 
+                        step="0.1"
+                        className="admin-input pl-12 text-center font-bold" 
+                        value={config.minOffset} 
+                        onChange={e => setConfig({...config, minOffset: parseFloat(e.target.value) || -3})} 
+                       />
+                     </div>
+                     <div className="relative">
+                       <span className="absolute left-3 top-2.5 text-slate-400 text-xs font-bold">MAX</span>
+                       <input 
+                        type="number" 
+                        step="0.1"
+                        className="admin-input pl-12 text-center font-bold" 
+                        value={config.maxOffset} 
+                        onChange={e => setConfig({...config, maxOffset: parseFloat(e.target.value) || 3})} 
+                       />
+                     </div>
+                   </div>
+                 </div>
+
+                 <div>
+                   <label className="text-[9px] font-bold uppercase text-slate-400 block mb-1">Schrittweite (°C)</label>
+                   <input 
+                    type="number" 
+                    step="0.1"
+                    className="admin-input text-center font-bold" 
+                    value={config.stepSize} 
+                    onChange={e => setConfig({...config, stepSize: parseFloat(e.target.value) || 0.5})} 
+                   />
+                 </div>
+               </div>
+            </div>
+
+            <div className="bg-white p-6 rounded-2xl border shadow-sm">
                <h3 className="font-bold text-sm mb-4 uppercase flex items-center gap-2"><Lock size={16}/> Sicherheitsschlüssel</h3>
                <p className="text-[10px] text-slate-400 mb-4 leading-relaxed">
                  Dieser Schlüssel muss auf dem Server und beim Token-Check identisch sein. 
@@ -281,7 +326,7 @@ const AdminPanel: React.FC<AdminPanelProps> = ({ onClose, onPreviewRoom }) => {
                <div className="flex items-center gap-4">
                  <input 
                   type="number" 
-                  className="admin-input w-24 text-center" 
+                  className="admin-input w-24 text-center font-bold" 
                   value={config.sessionDurationMinutes} 
                   onChange={e => setConfig({...config, sessionDurationMinutes: parseInt(e.target.value) || 1})} 
                   min="1"
