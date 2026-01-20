@@ -33,25 +33,31 @@ const MainControl: React.FC<MainControlProps> = ({ soll, ist, offset, mode, onAd
             onClick={() => !isBlocked && onAdjust(-0.5)}
             disabled={isBlocked}
             className={`flex-1 bg-[#535353] text-white flex items-center justify-center text-3xl font-extralight transition-all border-r border-teal-600/20 ${
-              isBlocked ? 'opacity-30 cursor-not-allowed grayscale contrast-50' : 'hover:bg-[#404040] active:scale-95'
+              isBlocked ? 'opacity-20 cursor-not-allowed grayscale' : 'hover:bg-[#404040] active:scale-95'
             }`}
           >
             —
           </button>
-          <div className={`w-24 bg-[#00828c] flex items-center justify-center border border-teal-500/50 text-white font-extralight text-base tracking-tighter transition-opacity ${isBlocked ? 'opacity-60' : 'opacity-100'}`}>
+          <div className={`w-24 bg-[#00828c] flex items-center justify-center border border-teal-500/50 text-white font-extralight text-base tracking-tighter transition-opacity ${isBlocked ? 'opacity-50' : 'opacity-100'}`}>
             {offset > 0 ? '+' : ''}{offset.toFixed(1)} °C
           </div>
           <button 
             onClick={() => !isBlocked && onAdjust(0.5)}
             disabled={isBlocked}
             className={`flex-1 bg-[#535353] text-white flex items-center justify-center text-3xl font-extralight transition-all border-l border-teal-600/20 ${
-              isBlocked ? 'opacity-30 cursor-not-allowed grayscale contrast-50' : 'hover:bg-[#404040] active:scale-95'
+              isBlocked ? 'opacity-20 cursor-not-allowed grayscale' : 'hover:bg-[#404040] active:scale-95'
             }`}
           >
             +
           </button>
         </div>
       </div>
+      
+      {isBlocked && (
+        <p className="text-[9px] text-[#00828c] uppercase tracking-widest mt-4 opacity-60 font-bold">
+          Anpassung nur im Komfort-Modus möglich
+        </p>
+      )}
     </div>
   );
 };

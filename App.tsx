@@ -164,7 +164,7 @@ const App: React.FC = () => {
 
   if (!currentRoomId || (isExpired && !isPreview)) {
     return (
-      <div className="relative h-screen w-full max-w-md mx-auto overflow-hidden shadow-2xl">
+      <div className="relative h-screen w-full max-w-md mx-auto overflow-hidden shadow-2xl bg-[#00828c] touch-none">
         <ExpiredScreen />
         <div 
           className="absolute top-0 left-0 w-full h-20 z-[100]" 
@@ -190,7 +190,7 @@ const App: React.FC = () => {
 
   if (loading || !status) {
     return (
-      <div className="h-screen w-full flex items-center justify-center bg-[#e0e4e7]">
+      <div className="h-screen w-full flex items-center justify-center bg-[#e0e4e7] touch-none">
         <div className="flex flex-col items-center gap-4">
           <div className="w-10 h-10 border-2 border-t-transparent border-[#00828c] rounded-full animate-spin"></div>
           <span className="text-[10px] text-[#00828c] uppercase tracking-widest">Lade Raumdaten...</span>
@@ -200,7 +200,7 @@ const App: React.FC = () => {
   }
 
   return (
-    <div className="h-screen flex flex-col bg-[#e0e4e7] max-w-md mx-auto shadow-2xl relative overflow-hidden select-none">
+    <div className="h-screen w-full flex flex-col bg-[#e0e4e7] max-w-md mx-auto shadow-2xl relative overflow-hidden select-none touch-none">
       <div 
         onMouseDown={handleAdminStart} 
         onMouseUp={handleAdminEnd}
@@ -215,7 +215,7 @@ const App: React.FC = () => {
         />
       </div>
       
-      <main className="flex-1 overflow-y-auto flex flex-col relative">
+      <main className="flex-1 overflow-hidden flex flex-col relative">
         {isRateLimited && (
           <div className="absolute top-0 left-0 w-full z-20 bg-amber-500/90 text-white text-[10px] font-bold py-1 px-4 flex items-center justify-center gap-2 animate-pulse">
             <AlertTriangle size={12} /> API RATE LIMIT - BITTE WARTEN

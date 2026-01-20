@@ -101,7 +101,15 @@ class GekkoService {
     const options: RequestInit = {
       mode: 'cors',
       cache: 'no-cache',
+      headers: {
+        'Accept': 'application/json'
+      }
     };
+
+    // Add X-Requested-With if using a proxy (required by cors-anywhere)
+    if (this.config.corsProxy && this.config.corsProxy.trim() !== '') {
+      (options.headers as any)['X-Requested-With'] = 'XMLHttpRequest';
+    }
 
     if (typeof AbortSignal !== 'undefined' && 'timeout' in AbortSignal) {
       // @ts-ignore
@@ -110,10 +118,7 @@ class GekkoService {
 
     if (this.config.apiMode === 'local') {
       const authString = `${this.config.username}:${this.config.password}`;
-      options.headers = {
-        'Authorization': 'Basic ' + btoa(authString),
-        'Accept': 'application/json'
-      };
+      (options.headers as any)['Authorization'] = 'Basic ' + btoa(authString);
     }
 
     return options;
@@ -127,6 +132,7 @@ class GekkoService {
     try {
       const response = await fetch(url, this.getFetchOptions());
       if (response.ok) return { success: true, message: "Verbindung OK", debugUrl: url };
+      if (response.status === 403) return { success: false, message: "403 Forbidden: Proxy blockiert evtl.", debugUrl: url };
       if (response.status === 429) {
         this.last429Time = Date.now();
         return { success: false, message: "429: Zu viele Anfragen", debugUrl: url };

@@ -1,5 +1,4 @@
-
-import { useState, useEffect } from 'react';
+import React, { useState, useEffect } from 'react';
 import { ChevronLeft } from 'lucide-react';
 
 interface HeaderProps {
@@ -35,10 +34,10 @@ const Header: React.FC<HeaderProps> = ({ roomName, category, onBack, showBack })
       </div>
 
       {/* Centered Title and Info */}
-      <div className="flex-1 text-center px-10">
+      <div className="flex-1 text-center">
         <h1 className="text-xl font-extralight leading-none tracking-wide">Raumregelung</h1>
         <p className="text-[11px] font-extralight mt-1 opacity-90 uppercase tracking-tighter">
-          <span className="font-normal">{category || 'RÄUME'}</span> | <span className="font-normal">{roomName}</span>
+          <span className="font-semibold">{category || 'RÄUME'}</span> | <span>{roomName}</span>
         </p>
       </div>
 
