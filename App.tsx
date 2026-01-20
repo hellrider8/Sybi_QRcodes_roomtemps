@@ -28,29 +28,24 @@ const App: React.FC = () => {
     setCurrentRoomId(null);
     setStatus(null);
     setIsExpired(true);
-    // URL komplett säubern
     window.history.replaceState({}, '', window.location.origin + window.location.pathname);
   }, []);
 
   useEffect(() => {
     const path = window.location.pathname;
     const params = new URLSearchParams(window.location.search);
-    const token = params.get('t'); // Magic Token
-    const roomIdDirect = params.get('room'); // Fallback für Legacy
+    const token = params.get('t');
+    const roomIdDirect = params.get('room');
 
-    // 1. Admin Check
     if (path === '/admin' || path === '/admin/') {
       const pw = prompt("System-Passwort für Admin-Bereich:");
-      if (pw === "sybtec" || pw === "") {
-        setShowAdmin(true);
-      } else {
-        window.location.href = "/";
-      }
+      if (pw === "sybtec" || pw === "") setShowAdmin(true);
+      else window.location.href = "/";
       setLoading(false);
       return;
     }
     
-    // 2. Token Verarbeitung (Sicherer Weg)
+    // Zuerst Token prüfen
     if (token) {
       const decoded = gekkoService.decodeToken(token);
       if (decoded) {
@@ -59,14 +54,16 @@ const App: React.FC = () => {
         localStorage.setItem('gekko_session_start', Date.now().toString());
         localStorage.setItem('gekko_current_room', decoded.roomId);
         
-        // URL SOFORT BEREINIGEN - Der Token verschwindet aus der Adresszeile!
-        // Wir lassen nur noch ?room=... zur Info stehen, aber ohne den Access-Token
+        // URL bereinigen
         const cleanUrl = window.location.origin + window.location.pathname + `?room=${decoded.roomId}`;
         window.history.replaceState({}, '', cleanUrl);
+        setLoading(false);
+        return;
       }
     } 
-    // 3. Fallback / Session-Wiederherstellung
-    else if (roomIdDirect) {
+    
+    // Dann Fallback auf Room-Parameter oder Storage
+    if (roomIdDirect) {
       setCurrentRoomId(roomIdDirect);
       gekkoService.setCurrentRoom(roomIdDirect);
     } else {
@@ -81,10 +78,8 @@ const App: React.FC = () => {
   }, []);
 
   const checkExpiry = useCallback(() => {
-    if (isPreview || showAdmin) {
-      setIsExpired(false);
-      return;
-    }
+    // Wenn wir gerade laden oder im Admin sind, kein "Expired" anzeigen
+    if (loading || isPreview || showAdmin) return;
 
     const startTimeStr = localStorage.getItem('gekko_session_start');
     const storedRoom = localStorage.getItem('gekko_current_room');
@@ -95,42 +90,41 @@ const App: React.FC = () => {
     }
 
     const startTime = parseInt(startTimeStr, 10);
-    const now = Date.now();
-
-    if (now - startTime > SESSION_DURATION_MS) {
+    if (Date.now() - startTime > SESSION_DURATION_MS) {
       setIsExpired(true);
     } else {
       setIsExpired(false);
     }
-  }, [currentRoomId, isPreview, showAdmin]);
+  }, [currentRoomId, isPreview, showAdmin, loading]);
 
   useEffect(() => {
-    checkExpiry();
-    const timer = setInterval(checkExpiry, 5000);
-    return () => clearInterval(timer);
-  }, [checkExpiry]);
+    if (!loading) {
+      checkExpiry();
+      const timer = setInterval(checkExpiry, 5000);
+      return () => clearInterval(timer);
+    }
+  }, [checkExpiry, loading]);
 
   const refreshData = useCallback(async () => {
-    if ((isExpired && !isPreview) || !currentRoomId || showAdmin) return;
-
+    if (loading || isExpired || !currentRoomId || showAdmin) return;
     try {
       const data = await gekkoService.fetchStatus(currentRoomId);
       setStatus(data);
     } catch (e: any) {
       console.error("Status-Update Fehler:", e);
     }
-  }, [isExpired, isPreview, currentRoomId, showAdmin]);
+  }, [isExpired, loading, currentRoomId, showAdmin]);
 
   useEffect(() => {
-    if (currentRoomId && !showAdmin) {
+    if (!loading && currentRoomId && !showAdmin) {
       refreshData();
       const interval = setInterval(refreshData, POLLING_INTERVAL_MS);
       return () => clearInterval(interval);
     }
-  }, [refreshData, currentRoomId, showAdmin]);
+  }, [refreshData, currentRoomId, showAdmin, loading]);
 
   const handleTempAdjust = async (delta: number) => {
-    if (!status || (isExpired && !isPreview) || !currentRoomId) return;
+    if (!status || isExpired || !currentRoomId) return;
     const newOffset = parseFloat((status.offset + delta).toFixed(2));
     const newSoll = parseFloat((status.sollTemp + delta).toFixed(2));
     setStatus(prev => prev ? { ...prev, sollTemp: newSoll, offset: newOffset } : null);
@@ -152,46 +146,41 @@ const App: React.FC = () => {
     }
   };
 
+  if (loading) {
+    return (
+      <div className="h-screen w-full flex flex-col items-center justify-center bg-[#e0e4e7]">
+        <div className="w-10 h-10 border-4 border-[#00828c]/20 border-t-[#00828c] rounded-full animate-spin"></div>
+      </div>
+    );
+  }
+
   if (showAdmin) {
     return (
       <AdminPanel 
-        onClose={() => {
-          setShowAdmin(false);
-          if (window.location.pathname.includes('admin')) {
-             window.location.href = "/";
-          }
-        }} 
+        onClose={() => setShowAdmin(false)} 
         onPreviewRoom={(id) => { 
           setIsPreview(true); 
           setCurrentRoomId(id); 
           gekkoService.setCurrentRoom(id); 
           setShowAdmin(false); 
-          refreshData(); 
         }} 
       />
     );
   }
 
-  if (!currentRoomId || (isExpired && !isPreview)) {
+  if (!currentRoomId || isExpired) {
     return (
       <div className="h-screen w-full max-w-md mx-auto relative overflow-hidden shadow-2xl bg-[#00828c]">
         <ExpiredScreen onAdminClick={() => setShowAdmin(true)} />
-        <div 
-          className="absolute top-0 left-0 w-full h-24" 
-          onMouseDown={handleAdminStart} 
-          onMouseUp={handleAdminEnd} 
-          onTouchStart={handleAdminStart} 
-          onTouchEnd={handleAdminEnd} 
-        />
+        <div className="absolute top-0 left-0 w-full h-24" onMouseDown={handleAdminStart} onMouseUp={handleAdminEnd} onTouchStart={handleAdminStart} onTouchEnd={handleAdminEnd} />
       </div>
     );
   }
 
-  if (loading || !status) {
+  if (!status) {
     return (
       <div className="h-screen w-full flex flex-col items-center justify-center bg-[#e0e4e7]">
-        <div className="w-12 h-12 border-4 border-[#00828c]/20 border-t-[#00828c] rounded-full animate-spin mb-4"></div>
-        <span className="text-[10px] font-bold text-[#00828c] uppercase tracking-widest">Initialisierung...</span>
+        <span className="text-[10px] font-bold text-[#00828c] uppercase tracking-widest">Lade Status...</span>
       </div>
     );
   }
@@ -202,19 +191,13 @@ const App: React.FC = () => {
         <Header 
           roomName={status.roomName} 
           category={status.category} 
-          onBack={isPreview ? () => { setIsPreview(false); window.location.reload(); } : logout} 
+          onBack={isPreview ? () => window.location.reload() : logout} 
           showBack={isPreview || !!currentRoomId} 
           isLogout={!isPreview}
         />
       </div>
       <main className="flex-1 flex flex-col relative">
-        <MainControl 
-          soll={status.sollTemp} 
-          ist={status.istTemp} 
-          offset={status.offset} 
-          mode={status.betriebsart} 
-          onAdjust={handleTempAdjust} 
-        />
+        <MainControl soll={status.sollTemp} ist={status.istTemp} offset={status.offset} mode={status.betriebsart} onAdjust={handleTempAdjust} />
         <StatusLine regler={status.reglerPercent} ventilator={status.ventilatorState} />
         <Footer hauptMode={status.hauptbetriebsart} subMode={status.betriebsart} feuchte={status.feuchte} />
       </main>

@@ -18,7 +18,6 @@ class GekkoService {
     username: '',
     password: '',
     useMock: true,
-    // FIX: Statischer Key als Default, damit Handy den Token vom PC versteht
     secretKey: 'sybtec-static-access-key-2024',
     corsProxy: '',
     rooms: [] 
@@ -56,29 +55,28 @@ class GekkoService {
     this.saveToStorage();
   }
 
+  // URL-Safe Base64: + wird -, / wird _
   generateToken(roomId: string): string {
-    // Einfaches JSON Objekt als Base64
     const payload = JSON.stringify({
       r: roomId,
       s: this.config.secretKey
     });
-    // Wir nutzen btoa für einfaches Base64
-    return btoa(payload).replace(/=/g, ''); 
+    const base64 = btoa(payload);
+    return base64.replace(/\+/g, '-').replace(/\//g, '_').replace(/=/g, '');
   }
 
   decodeToken(token: string): { roomId: string } | null {
     try {
-      // Padding wiederherstellen falls nötig
-      let base64 = token;
+      // Zurück zu Standard Base64
+      let base64 = token.replace(/-/g, '+').replace(/_/g, '/');
       while (base64.length % 4 !== 0) base64 += '=';
       
       const decoded = JSON.parse(atob(base64));
-      // Prüfen ob der Schlüssel im Token mit unserem aktuellen Schlüssel übereinstimmt
       if (decoded.s === this.config.secretKey) {
         return { roomId: decoded.r };
       }
     } catch (e) {
-      console.error("Token Dekodierungsfehler");
+      console.error("Token Dekodierungsfehler - Token evtl. beschädigt oder Key ungleich.");
     }
     return null;
   }
