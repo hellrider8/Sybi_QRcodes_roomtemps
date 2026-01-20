@@ -5,70 +5,48 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover" />
     <title>TEKKO Raumregelung</title>
     <script src="https://cdn.tailwindcss.com"></script>
-    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@200;300;400;500;700&display=swap" rel="stylesheet">
-    <style>
-        html, body { margin: 0; padding: 0; width: 100%; height: 100dvh; background-color: #e0e4e7; font-family: 'Inter', sans-serif; overflow: hidden; }
-        #root { height: 100%; }
-    </style>
     <script type="importmap">
     {
         "imports": {
             "react": "https://esm.sh/react@18.2.0",
             "react-dom": "https://esm.sh/react-dom@18.2.0/client",
-            "lucide-react": "https://esm.sh/lucide-react@0.263.1?external=react"
+            "lucide-react": "https://esm.sh/lucide-react@0.460.0?external=react"
         }
     }
     </script>
+    <style>
+        body { background-color: #e0e4e7; margin: 0; font-family: sans-serif; height: 100dvh; display: flex; align-items: center; justify-content: center; }
+    </style>
 </head>
 <body>
     <div id="root"></div>
 
     <script type="module">
-        import React, { useState, useEffect } from 'react';
+        import React, { useState } from 'react';
         import { createRoot } from 'react-dom';
-        import { Thermometer, ThermometerSnowflake, Settings, QrCode } from 'lucide-react';
+        import { Thermometer, Settings, Minus, Plus } from 'lucide-react';
 
         function App() {
-            const [temp, setTemp] = useState(21.5);
-            const urlParams = new URLSearchParams(window.location.search);
-            const raum = urlParams.get('raum') || 'Standardraum';
+            const [temp, setTemp] = useState(21.0);
+            const params = new URLSearchParams(window.location.search);
+            const raum = params.get('raum') || 'Wohnzimmer';
 
-            return (
-                <div className="flex items-center justify-center h-full p-6">
-                    <div className="bg-white p-8 rounded-[40px] shadow-xl text-center w-full max-w-sm border border-gray-100">
-                        <div className="flex justify-between items-center mb-8">
-                            <QrCode size={24} className="text-gray-400" />
-                            <Settings size={24} className="text-gray-400" />
-                        </div>
-                        
-                        <div className="room-label text-xs font-bold text-gray-400 uppercase tracking-[0.2em] mb-2">
-                            {raum}
-                        </div>
-                        
-                        <div className="flex justify-center items-center mb-6">
-                            <div className="relative">
-                                <Thermometer size={80} className="text-blue-500 relative z-10" />
-                                <div className="absolute inset-0 bg-blue-100 blur-2xl rounded-full opacity-50"></div>
-                            </div>
-                        </div>
-
-                        <div className="text-7xl font-light text-gray-800 mb-8 flex justify-center items-start">
-                            <span>{temp.toFixed(1)}</span>
-                            <span className="text-2xl mt-3 ml-1">°C</span>
-                        </div>
-
-                        <div className="flex gap-4">
-                            <button 
-                                onClick={() => setTemp(t => t - 0.5)}
-                                className="flex-1 bg-gray-100 py-4 rounded-2xl text-2xl font-bold text-gray-600 active:scale-95 transition-all"
-                            >-</button>
-                            <button 
-                                onClick={() => setTemp(t => t + 0.5)}
-                                className="flex-1 bg-blue-500 py-4 rounded-2xl text-2xl font-bold text-white shadow-lg shadow-blue-200 active:scale-95 transition-all"
-                            >+</button>
-                        </div>
-                    </div>
-                </div>
+            return React.createElement('div', { className: 'bg-white p-8 rounded-[40px] shadow-2xl text-center w-80' },
+                React.createElement('div', { className: 'text-xs font-bold text-gray-400 uppercase tracking-widest mb-4' }, raum),
+                React.createElement('div', { className: 'flex justify-center mb-6' }, 
+                    React.createElement(Thermometer, { size: 64, className: 'text-blue-500' })
+                ),
+                React.createElement('div', { className: 'text-6xl font-light mb-8' }, temp.toFixed(1) + '°'),
+                React.createElement('div', { className: 'flex gap-4' },
+                    React.createElement('button', { 
+                        onClick: () => setTemp(t => t - 0.5),
+                        className: 'flex-1 bg-gray-100 p-4 rounded-2xl active:bg-gray-200' 
+                    }, React.createElement(Minus)),
+                    React.createElement('button', { 
+                        onClick: () => setTemp(t => t + 0.5),
+                        className: 'flex-1 bg-blue-500 text-white p-4 rounded-2xl active:bg-blue-600' 
+                    }, React.createElement(Plus))
+                )
             );
         }
 
