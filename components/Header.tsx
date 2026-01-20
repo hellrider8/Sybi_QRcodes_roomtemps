@@ -1,4 +1,5 @@
-import React, { useState, useEffect } from 'react';
+
+import { useState, useEffect } from 'react';
 import { ChevronLeft } from 'lucide-react';
 
 interface HeaderProps {
