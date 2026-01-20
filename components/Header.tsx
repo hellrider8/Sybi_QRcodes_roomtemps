@@ -1,16 +1,16 @@
 
-// Added React import to fix namespace error
 import React, { useState, useEffect } from 'react';
-import { ChevronLeft } from 'lucide-react';
+import { ChevronLeft, LogOut } from 'lucide-react';
 
 interface HeaderProps {
   roomName: string;
   category: string;
   onBack?: () => void;
   showBack?: boolean;
+  isLogout?: boolean;
 }
 
-const Header: React.FC<HeaderProps> = ({ roomName, category, onBack, showBack }) => {
+const Header: React.FC<HeaderProps> = ({ roomName, category, onBack, showBack, isLogout }) => {
   const [time, setTime] = useState(new Date());
 
   useEffect(() => {
@@ -29,13 +29,11 @@ const Header: React.FC<HeaderProps> = ({ roomName, category, onBack, showBack })
 
   return (
     <header className="bg-[#00828c] text-white h-16 flex items-center px-4 shadow-md z-10 relative overflow-hidden">
-      {/* Time & Date on the left */}
       <div className="flex flex-col leading-tight absolute left-4 z-20">
         <span className="text-xl font-light tracking-tight">{formatTime(time)}</span>
         <span className="text-[10px] font-extralight opacity-80 uppercase tracking-wider">{formatDate(time)}</span>
       </div>
 
-      {/* Centered Title and Info */}
       <div className="flex-1 text-center">
         <h1 className="text-xl font-extralight leading-none tracking-wide">Raumregelung</h1>
         <p className="text-[11px] font-extralight mt-1 opacity-90 uppercase tracking-tighter">
@@ -43,14 +41,18 @@ const Header: React.FC<HeaderProps> = ({ roomName, category, onBack, showBack })
         </p>
       </div>
 
-      {/* Conditional Back button on the right */}
       {showBack && (
         <div className="absolute right-4 flex items-center z-20">
           <button 
             onClick={onBack}
-            className="p-1 hover:bg-black/10 rounded transition-colors"
+            className="p-2 hover:bg-black/10 rounded-full transition-colors flex items-center gap-1"
+            title={isLogout ? "Abmelden" : "Zurück"}
           >
-            <ChevronLeft size={30} strokeWidth={1} className="cursor-pointer" />
+            {isLogout ? (
+              <LogOut size={24} strokeWidth={1.5} className="cursor-pointer text-white/70 hover:text-white" />
+            ) : (
+              <ChevronLeft size={30} strokeWidth={1} className="cursor-pointer" />
+            )}
           </button>
         </div>
       )}
