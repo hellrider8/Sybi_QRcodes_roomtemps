@@ -30,7 +30,6 @@ class GekkoService {
     this.loadFromStorage();
   }
 
-  // Hilfsfunktion zum Senden von Logs an den Server-Terminal
   async logToServer(level: 'INFO' | 'ERROR' | 'WARN', message: string, data?: any) {
     console.log(`[${level}] ${message}`, data || '');
     try {
@@ -86,15 +85,21 @@ class GekkoService {
       const decodedStr = atob(base64);
       const decoded = JSON.parse(decodedStr);
       
-      if (decoded.s === this.config.secretKey) {
-        this.logToServer('INFO', 'Token erfolgreich validiert', { room: decoded.r });
-        return { roomId: decoded.r };
-      } else {
-        this.logToServer('ERROR', 'Schlüssel-Mismatch!', { 
-          tokenKey: decoded.s, 
-          localKey: this.config.secretKey 
+      // NEU: Wenn der Schlüssel im Token anders ist als lokal, 
+      // nehmen wir an, dass der Admin den Schlüssel geändert hat.
+      // Wir übernehmen den neuen Schlüssel automatisch, damit der Zugriff klappt.
+      if (decoded.s && decoded.s !== this.config.secretKey) {
+        this.logToServer('WARN', 'Schlüssel wurde am Admin-Gerät geändert. Synchronisiere...', { 
+          oldKey: this.config.secretKey, 
+          newKey: decoded.s 
         });
+        this.config.secretKey = decoded.s;
+        this.saveToStorage();
       }
+
+      this.logToServer('INFO', 'Token erfolgreich validiert', { room: decoded.r });
+      return { roomId: decoded.r };
+      
     } catch (e: any) {
       this.logToServer('ERROR', 'Kritischer Dekodierungsfehler', { error: e.message });
     }

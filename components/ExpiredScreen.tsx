@@ -1,6 +1,6 @@
 
 import React from 'react';
-import { QrCode, Lock, Settings, AlertTriangle } from 'lucide-react';
+import { QrCode, Lock, Settings, AlertTriangle, RefreshCw } from 'lucide-react';
 
 interface ExpiredScreenProps {
   reason?: string;
@@ -8,6 +8,13 @@ interface ExpiredScreenProps {
 }
 
 const ExpiredScreen: React.FC<ExpiredScreenProps> = ({ reason, onAdminClick }) => {
+  const handleHardReset = () => {
+    if (confirm("Möchten Sie alle lokalen Einstellungen auf diesem Gerät löschen? Dies behebt oft Probleme beim Scannen.")) {
+      localStorage.clear();
+      window.location.href = window.location.origin + window.location.pathname;
+    }
+  };
+
   return (
     <div className="h-screen w-full flex flex-col items-center justify-center bg-[#00828c] text-white p-10 text-center">
       <div className="mb-8 relative">
@@ -31,12 +38,20 @@ const ExpiredScreen: React.FC<ExpiredScreenProps> = ({ reason, onAdminClick }) =
           Sicherheitssystem Aktiv
         </div>
         
-        <button 
-          onClick={onAdminClick}
-          className="text-[9px] uppercase tracking-widest text-white/20 hover:text-white/40 transition-colors mt-4"
-        >
-          System-Einstellungen
-        </button>
+        <div className="flex gap-8 mt-4">
+          <button 
+            onClick={onAdminClick}
+            className="text-[9px] uppercase tracking-widest text-white/40 hover:text-white transition-colors"
+          >
+            Backend
+          </button>
+          <button 
+            onClick={handleHardReset}
+            className="text-[9px] uppercase tracking-widest text-white/40 hover:text-white transition-colors flex items-center gap-1"
+          >
+            <RefreshCw size={10} /> Reset App
+          </button>
+        </div>
       </div>
     </div>
   );
