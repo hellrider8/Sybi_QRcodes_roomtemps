@@ -8,9 +8,44 @@ const fs = require('fs');
 
 const app = express();
 const PORT = process.env.PORT || 3000;
+const CONFIG_FILE = path.join(__dirname, 'config.json');
 
 app.use(cors());
-app.use(express.json()); // Erlaubt das Empfangen von JSON-Logs
+app.use(express.json());
+
+// Hilfsfunktion zum Lesen der Config
+const readConfig = () => {
+    if (!fs.existsSync(CONFIG_FILE)) {
+        return {
+            apiMode: 'local',
+            ip: '',
+            gekkoId: '',
+            username: '',
+            password: '',
+            useMock: true,
+            secretKey: 'sybtec-static-access-key-2024',
+            rooms: []
+        };
+    }
+    return JSON.parse(fs.readFileSync(CONFIG_FILE, 'utf8'));
+};
+
+// Endpunkt: Config laden
+app.get('/api/config', (req, res) => {
+    res.json(readConfig());
+});
+
+// Endpunkt: Config speichern
+app.post('/api/config', (req, res) => {
+    try {
+        const newConfig = req.body;
+        fs.writeFileSync(CONFIG_FILE, JSON.stringify(newConfig, null, 2));
+        console.log(`[SERVER] Konfiguration aktualisiert.`);
+        res.sendStatus(200);
+    } catch (err) {
+        res.status(500).send(err.message);
+    }
+});
 
 // Debug-Endpunkt für Handy-Logs
 app.post('/api/log', (req, res) => {
@@ -70,10 +105,10 @@ app.get('*', (req, res) => {
 app.listen(PORT, () => {
     console.log(`
 ==================================================
-  TEKKO SERVER LÄUFT
+  TEKKO SERVER LÄUFT (Zentrale Config Aktiv)
 ==================================================
   URL: http://localhost:${PORT}
-  Debug-Logs: Aktiv (Handy-Fehler erscheinen hier)
+  Config: ${CONFIG_FILE}
 ==================================================
     `);
 });

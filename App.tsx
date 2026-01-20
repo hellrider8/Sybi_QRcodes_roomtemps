@@ -40,7 +40,10 @@ const App: React.FC = () => {
       const token = params.get('t');
       const roomIdDirect = params.get('room');
 
-      gekkoService.logToServer('INFO', 'App Initialisierung...', { token: !!token, room: roomIdDirect });
+      // ERST: Zentrale Config vom Server holen
+      await gekkoService.loadConfig();
+
+      gekkoService.logToServer('INFO', 'App Initialisierung (Server-Mode)...', { token: !!token, room: roomIdDirect });
 
       if (path === '/admin' || path === '/admin/') {
         const pw = prompt("System-Passwort für Admin-Bereich:");
@@ -63,7 +66,7 @@ const App: React.FC = () => {
           setLoading(false);
           return;
         } else {
-          setExpiryReason("Token ungültig oder Schlüssel-Mismatch");
+          setExpiryReason("Sicherheitsschlüssel-Konflikt");
           setIsExpired(true);
         }
       } 
@@ -101,14 +104,14 @@ const App: React.FC = () => {
 
     if (currentRoomId !== storedRoom) {
       setIsExpired(true);
-      setExpiryReason("Raum-Mismatch");
+      setExpiryReason("Raum-Wechsel erkannt");
       return;
     }
 
     const startTime = parseInt(startTimeStr, 10);
     if (Date.now() - startTime > SESSION_DURATION_MS) {
       setIsExpired(true);
-      setExpiryReason("Sitzung abgelaufen (15 min)");
+      setExpiryReason("Sitzung abgelaufen (Sicherheits-Timeout)");
     } else {
       setIsExpired(false);
     }

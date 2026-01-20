@@ -1,8 +1,6 @@
 
 import { GekkoStatus, GekkoConfig, RoomDefinition } from '../types.ts';
 
-const STORAGE_KEY = 'gekko_full_config';
-
 export interface DiscoveryResult {
   rooms: RoomDefinition[];
   rawData: any;
@@ -26,9 +24,7 @@ class GekkoService {
   private currentRoomId: string = '';
   public lastRawStatus: string = ""; 
 
-  constructor() {
-    this.loadFromStorage();
-  }
+  constructor() {}
 
   async logToServer(level: 'INFO' | 'ERROR' | 'WARN', message: string, data?: any) {
     console.log(`[${level}] ${message}`, data || '');
@@ -41,31 +37,42 @@ class GekkoService {
     } catch (e) {}
   }
 
-  private loadFromStorage() {
-    const stored = localStorage.getItem(STORAGE_KEY);
-    if (stored) {
-      try {
-        const parsed = JSON.parse(stored);
-        this.config = { ...this.config, ...parsed };
-      } catch (e) {
-        console.error("Failed to parse config", e);
+  // Lädt die Config vom Server (config.json)
+  async loadConfig(): Promise<GekkoConfig> {
+    try {
+      const response = await fetch('/api/config');
+      if (response.ok) {
+        this.config = await response.json();
       }
+    } catch (e) {
+      console.error("Fehler beim Laden der Server-Config", e);
     }
+    return this.config;
   }
 
-  saveToStorage() {
-    localStorage.setItem(STORAGE_KEY, JSON.stringify(this.config));
+  // Speichert die Config auf dem Server
+  async saveConfig() {
+    try {
+      await fetch('/api/config', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(this.config)
+      });
+    } catch (e) {
+      console.error("Fehler beim Speichern auf Server", e);
+    }
   }
 
   getConfig() {
     return { ...this.config };
   }
 
-  setConfig(newConfig: Partial<GekkoConfig>) {
+  async setConfig(newConfig: Partial<GekkoConfig>) {
     this.config = { ...this.config, ...newConfig };
-    this.saveToStorage();
+    await this.saveConfig();
   }
 
+  // Token ist jetzt schlanker, da die API-Daten vom Server kommen
   generateToken(roomId: string): string {
     const payload = JSON.stringify({
       r: roomId,
@@ -77,31 +84,21 @@ class GekkoService {
 
   decodeToken(token: string): { roomId: string } | null {
     try {
-      this.logToServer('INFO', 'Dekodiere Token...', { tokenLength: token.length });
-      
       let base64 = token.replace(/-/g, '+').replace(/_/g, '/');
       while (base64.length % 4 !== 0) base64 += '=';
       
       const decodedStr = atob(base64);
-      const decoded = JSON.parse(decodedStr);
+      const data = JSON.parse(decodedStr);
       
-      // NEU: Wenn der Schlüssel im Token anders ist als lokal, 
-      // nehmen wir an, dass der Admin den Schlüssel geändert hat.
-      // Wir übernehmen den neuen Schlüssel automatisch, damit der Zugriff klappt.
-      if (decoded.s && decoded.s !== this.config.secretKey) {
-        this.logToServer('WARN', 'Schlüssel wurde am Admin-Gerät geändert. Synchronisiere...', { 
-          oldKey: this.config.secretKey, 
-          newKey: decoded.s 
-        });
-        this.config.secretKey = decoded.s;
-        this.saveToStorage();
+      // Sicherheits-Check
+      if (data.s && data.s !== this.config.secretKey) {
+        this.logToServer('ERROR', 'Token-Schlüssel passt nicht zur Server-Config', { tokenKey: data.s });
+        return null;
       }
 
-      this.logToServer('INFO', 'Token erfolgreich validiert', { room: decoded.r });
-      return { roomId: decoded.r };
-      
+      return { roomId: data.r };
     } catch (e: any) {
-      this.logToServer('ERROR', 'Kritischer Dekodierungsfehler', { error: e.message });
+      this.logToServer('ERROR', 'Token Dekodierung fehlgeschlagen', { error: e.message });
     }
     return null;
   }
@@ -137,25 +134,16 @@ class GekkoService {
   }
 
   private getFetchOptions(): RequestInit {
-    const headers: Record<string, string> = {
-      'Accept': 'application/json'
-    };
-
+    const headers: Record<string, string> = { 'Accept': 'application/json' };
     if (this.config.apiMode === 'local') {
       const authString = `${this.config.username}:${this.config.password}`;
       headers['Authorization'] = 'Basic ' + btoa(authString);
     }
-
-    return {
-      mode: 'cors',
-      cache: 'no-cache',
-      headers
-    };
+    return { mode: 'cors', cache: 'no-cache', headers };
   }
 
   async testConnection(): Promise<{ success: boolean; message: string }> {
     if (this.config.useMock) return { success: true, message: "Simulation OK" };
-    
     const url = this.getUrl('/roomtemps/');
     try {
       const response = await fetch(url, this.getFetchOptions());
@@ -177,22 +165,15 @@ class GekkoService {
         debugInfo: "Simulation"
       };
     }
-
     const url = this.getUrl('/roomtemps/');
     try {
       const response = await fetch(url, this.getFetchOptions());
       const rawData = await response.json();
       const items = rawData.roomtemps || rawData;
       const rooms: RoomDefinition[] = [];
-
       for (const id in items) {
         if (typeof items[id] === 'object' && items[id] !== null) {
-          rooms.push({
-            id: id,
-            name: items[id].name || id,
-            category: items[id].page || "RÄUME",
-            enabled: true
-          });
+          rooms.push({ id, name: items[id].name || id, category: items[id].page || "RÄUME", enabled: true });
         }
       }
       return { rooms, rawData, debugInfo: "Import erfolgreich" };
@@ -210,15 +191,12 @@ class GekkoService {
         feuchte: 50, roomName: room?.name || "Demo-Raum", category: "DEMO"
       };
     }
-
     const url = this.getUrl(`/roomtemps/${roomId}/status`);
     const response = await fetch(url, this.getFetchOptions());
     const data = await response.json();
     const itemData = data[roomId] || data;
     const vals = (itemData.sumstate?.value || itemData.sumstate || "").split(';');
-    
     this.lastRawStatus = itemData.sumstate?.value || itemData.sumstate || "";
-
     return {
       istTemp: parseFloat(vals[0]) || 0,
       sollTemp: parseFloat(vals[1]) || 0,
