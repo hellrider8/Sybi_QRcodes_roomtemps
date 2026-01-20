@@ -28,27 +28,22 @@ const App: React.FC = () => {
     const roomIdFromUrl = params.get('room');
     const hasAccessFlag = params.get('access') === 'true';
     
-    const config = gekkoService.getConfig();
-
-    // 1. Fall: Ein Raum wird über URL/QR aufgerufen
+    // 1. Fall: Raum-ID ist in der URL vorhanden
     if (roomIdFromUrl) {
-      const roomValid = config.rooms.find(r => r.id === roomIdFromUrl);
+      setCurrentRoomId(roomIdFromUrl);
+      gekkoService.setCurrentRoom(roomIdFromUrl);
       
-      if (roomValid) {
-        setCurrentRoomId(roomIdFromUrl);
-        gekkoService.setCurrentRoom(roomIdFromUrl);
+      // Wenn 'access=true' dabei ist -> Session für dieses Handy starten
+      if (hasAccessFlag) {
+        localStorage.setItem('gekko_session_start', Date.now().toString());
+        localStorage.setItem('gekko_current_room', roomIdFromUrl);
         
-        // Wenn 'access=true' dabei ist -> Timer neu starten (neuer Scan)
-        if (hasAccessFlag) {
-          localStorage.setItem('gekko_session_start', Date.now().toString());
-          localStorage.setItem('gekko_current_room', roomIdFromUrl);
-          // URL säubern (access=true entfernen)
-          const newUrl = window.location.pathname + `?room=${roomIdFromUrl}`;
-          window.history.replaceState({}, '', newUrl);
-        }
+        // URL säubern: Entferne 'access=true', behalte aber 'room' für Refresh-Stabilität
+        const newUrl = window.location.origin + window.location.pathname + `?room=${roomIdFromUrl}`;
+        window.history.replaceState({}, '', newUrl);
       }
     } 
-    // 2. Fall: Kein Raum in URL, schaue ob noch einer im Speicher ist
+    // 2. Fall: Keine URL-Parameter, schaue in den Speicher (für Page-Refresh)
     else {
       const storedRoom = localStorage.getItem('gekko_current_room');
       if (storedRoom) {
@@ -62,6 +57,7 @@ const App: React.FC = () => {
 
   // Expiry Check Logic
   const checkExpiry = useCallback(() => {
+    // Im Admin-Vorschau-Modus läuft nichts ab
     if (isPreview) {
       setIsExpired(false);
       return;
@@ -70,7 +66,7 @@ const App: React.FC = () => {
     const startTimeStr = localStorage.getItem('gekko_session_start');
     const storedRoom = localStorage.getItem('gekko_current_room');
 
-    // Wenn kein Startzeitpunkt oder kein Raum -> Sofort Sperren
+    // Sicherheit: Wenn kein Startzeitpunkt oder Raum-Mismatch -> Sperren
     if (!startTimeStr || !currentRoomId || currentRoomId !== storedRoom) {
       setIsExpired(true);
       return;
@@ -86,23 +82,22 @@ const App: React.FC = () => {
     }
   }, [currentRoomId, isPreview]);
 
-  // Timer für Expiry
+  // Timer für Expiry (alle 5 Sek)
   useEffect(() => {
     checkExpiry();
     const timer = setInterval(checkExpiry, 5000);
     return () => clearInterval(timer);
   }, [checkExpiry]);
 
-  // Daten-Polling
+  // Daten-Abfrage vom Gekko
   const refreshData = useCallback(async () => {
-    if (isExpired && !isPreview) return;
-    if (!currentRoomId) return;
+    if ((isExpired && !isPreview) || !currentRoomId) return;
 
     try {
       const data = await gekkoService.fetchStatus(currentRoomId);
       setStatus(data);
     } catch (e: any) {
-      console.error("Fetch Error:", e);
+      console.error("Status-Update Fehler:", e);
     }
   }, [isExpired, isPreview, currentRoomId]);
 
@@ -120,19 +115,16 @@ const App: React.FC = () => {
     const newOffset = parseFloat((status.offset + delta).toFixed(2));
     const newSoll = parseFloat((status.sollTemp + delta).toFixed(2));
     
-    // Optimistisches UI Update
+    // UI sofort aktualisieren (Optimistic UI)
     setStatus(prev => prev ? { ...prev, sollTemp: newSoll, offset: newOffset } : null);
     
     const success = await gekkoService.setAdjustment(newOffset, currentRoomId);
-    if (!success) {
-      // Bei Fehler zurückrollen oder Refresh erzwingen
-      refreshData();
-    }
+    if (!success) refreshData(); // Bei Fehler echte Daten nachladen
   };
 
   const handleAdminStart = () => {
     pressTimer.current = window.setTimeout(() => {
-      const pw = prompt("Admin Passwort eingeben:");
+      const pw = prompt("System-Passwort:");
       if (pw === "sybtec" || pw === "") setShowAdmin(true);
     }, 2000);
   };
@@ -144,7 +136,6 @@ const App: React.FC = () => {
     }
   };
 
-  // Render Logic
   if (showAdmin) {
     return (
       <AdminPanel 
@@ -160,12 +151,13 @@ const App: React.FC = () => {
     );
   }
 
+  // Wenn kein Raum gewählt oder Zeit abgelaufen -> Expired Screen
   if (!currentRoomId || (isExpired && !isPreview)) {
     return (
-      <div className="h-screen w-full max-w-md mx-auto relative overflow-hidden shadow-2xl">
+      <div className="h-screen w-full max-w-md mx-auto relative overflow-hidden shadow-2xl bg-[#00828c]">
         <ExpiredScreen />
         <div 
-          className="absolute top-0 left-0 w-full h-20" 
+          className="absolute top-0 left-0 w-full h-24" 
           onMouseDown={handleAdminStart} 
           onMouseUp={handleAdminEnd} 
           onTouchStart={handleAdminStart} 
@@ -177,8 +169,9 @@ const App: React.FC = () => {
 
   if (loading || !status) {
     return (
-      <div className="h-screen w-full flex items-center justify-center bg-[#e0e4e7]">
-        <div className="w-10 h-10 border-2 border-t-transparent border-[#00828c] rounded-full animate-spin"></div>
+      <div className="h-screen w-full flex flex-col items-center justify-center bg-[#e0e4e7]">
+        <div className="w-12 h-12 border-4 border-[#00828c]/20 border-t-[#00828c] rounded-full animate-spin mb-4"></div>
+        <span className="text-[10px] font-bold text-[#00828c] uppercase tracking-widest">Verbindung zum Gekko...</span>
       </div>
     );
   }
