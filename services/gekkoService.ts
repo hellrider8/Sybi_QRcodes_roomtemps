@@ -18,7 +18,8 @@ class GekkoService {
     username: '',
     password: '',
     useMock: true,
-    secretKey: 'sybtec-magic-key-' + Math.random().toString(36).substring(7),
+    // FIX: Statischer Key als Default, damit Handy den Token vom PC versteht
+    secretKey: 'sybtec-static-access-key-2024',
     corsProxy: '',
     rooms: [] 
   };
@@ -55,24 +56,29 @@ class GekkoService {
     this.saveToStorage();
   }
 
-  // Token Logik: roomId + secretKey -> Base64
   generateToken(roomId: string): string {
+    // Einfaches JSON Objekt als Base64
     const payload = JSON.stringify({
       r: roomId,
-      s: this.config.secretKey,
-      t: Date.now()
+      s: this.config.secretKey
     });
-    return btoa(payload);
+    // Wir nutzen btoa für einfaches Base64
+    return btoa(payload).replace(/=/g, ''); 
   }
 
   decodeToken(token: string): { roomId: string } | null {
     try {
-      const decoded = JSON.parse(atob(token));
+      // Padding wiederherstellen falls nötig
+      let base64 = token;
+      while (base64.length % 4 !== 0) base64 += '=';
+      
+      const decoded = JSON.parse(atob(base64));
+      // Prüfen ob der Schlüssel im Token mit unserem aktuellen Schlüssel übereinstimmt
       if (decoded.s === this.config.secretKey) {
         return { roomId: decoded.r };
       }
     } catch (e) {
-      console.error("Invalid Token");
+      console.error("Token Dekodierungsfehler");
     }
     return null;
   }
@@ -131,11 +137,7 @@ class GekkoService {
     try {
       const response = await fetch(url, this.getFetchOptions());
       if (response.ok) return { success: true, message: "Verbindung erfolgreich!" };
-      
-      if (response.status === 401 || response.status === 403) {
-        return { success: false, message: "Zugriff verweigert (Benutzer/Key falsch?)" };
-      }
-      return { success: false, message: `Server Fehler: HTTP ${response.status}` };
+      return { success: false, message: `Fehler: HTTP ${response.status}` };
     } catch (e: any) {
       return { success: false, message: "Server nicht erreichbar." };
     }
