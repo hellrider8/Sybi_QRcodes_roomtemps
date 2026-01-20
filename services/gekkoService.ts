@@ -18,6 +18,7 @@ class GekkoService {
     username: '',
     password: '',
     useMock: true,
+    secretKey: 'sybtec-magic-key-' + Math.random().toString(36).substring(7),
     corsProxy: '',
     rooms: [] 
   };
@@ -52,6 +53,28 @@ class GekkoService {
   setConfig(newConfig: Partial<GekkoConfig>) {
     this.config = { ...this.config, ...newConfig };
     this.saveToStorage();
+  }
+
+  // Token Logik: roomId + secretKey -> Base64
+  generateToken(roomId: string): string {
+    const payload = JSON.stringify({
+      r: roomId,
+      s: this.config.secretKey,
+      t: Date.now()
+    });
+    return btoa(payload);
+  }
+
+  decodeToken(token: string): { roomId: string } | null {
+    try {
+      const decoded = JSON.parse(atob(token));
+      if (decoded.s === this.config.secretKey) {
+        return { roomId: decoded.r };
+      }
+    } catch (e) {
+      console.error("Invalid Token");
+    }
+    return null;
   }
 
   setCurrentRoom(id: string) {
@@ -122,8 +145,8 @@ class GekkoService {
     if (this.config.useMock) {
       return {
         rooms: [
-          { id: 'item0', name: 'Wohnzimmer (Sim)', enabled: true, category: 'EG' },
-          { id: 'item1', name: 'Küche (Sim)', enabled: true, category: 'EG' }
+          { id: 'item0', name: 'Wohnzimmer', enabled: true, category: 'DEMO' },
+          { id: 'item1', name: 'Küche', enabled: true, category: 'DEMO' }
         ],
         rawData: null,
         debugInfo: "Simulation"
@@ -134,13 +157,10 @@ class GekkoService {
     try {
       const response = await fetch(url, this.getFetchOptions());
       const rawData = await response.json();
-      
-      // Das Gekko-Objekt kann entweder direkt im Root oder unter "roomtemps" liegen
       const items = rawData.roomtemps || rawData;
       const rooms: RoomDefinition[] = [];
 
       for (const id in items) {
-        // Wir nehmen alles, was ein Objekt ist und einen Namen hat
         if (typeof items[id] === 'object' && items[id] !== null) {
           rooms.push({
             id: id,
@@ -150,11 +170,8 @@ class GekkoService {
           });
         }
       }
-      
-      console.log("Discovery results:", rooms);
       return { rooms, rawData, debugInfo: "Import erfolgreich" };
     } catch (e: any) {
-      console.error("Discovery error:", e);
       return { rooms: [], rawData: null, debugInfo: "Import fehlgeschlagen", error: e.message };
     }
   }
@@ -165,7 +182,7 @@ class GekkoService {
       return {
         sollTemp: 21.0, istTemp: 20.5 + Math.random(), offset: 0, reglerPercent: 20,
         ventilatorState: 0, hauptbetriebsart: 'AUTOMATIK', betriebsart: 'KOMFORT',
-        feuchte: 50, roomName: room?.name || "Test", category: "SIM"
+        feuchte: 50, roomName: room?.name || "Demo-Raum", category: "DEMO"
       };
     }
 

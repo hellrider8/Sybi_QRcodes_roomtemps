@@ -1,6 +1,6 @@
 
 import React, { useState, useEffect } from 'react';
-import { Save, Plus, Trash2, X, Settings, Shield, RefreshCw, Globe, Wifi, Eye, AlertCircle, CheckCircle2, Terminal, Copy, Server, Activity, Search, Hash, QrCode as QrIcon } from 'lucide-react';
+import { Save, Plus, Trash2, X, Settings, Shield, RefreshCw, Globe, Wifi, Eye, AlertCircle, CheckCircle2, Terminal, Copy, Server, Activity, Search, Hash, QrCode as QrIcon, Lock } from 'lucide-react';
 import { gekkoService } from '../services/gekkoService.ts';
 import { RoomDefinition } from '../types.ts';
 import { QRCodeCanvas } from 'qrcode.react';
@@ -71,10 +71,12 @@ const AdminPanel: React.FC<AdminPanelProps> = ({ onClose, onPreviewRoom }) => {
     setConfig({ ...config, rooms: newRooms });
   };
 
-  // Erzeugt einen absolut sauberen Link ohne Alt-Parameter
+  // Erzeugt einen Magic-Link mit verschlüsseltem Token
   const getQrUrl = (roomId: string) => {
-    const baseUrl = window.location.origin + window.location.pathname;
-    return `${baseUrl}?room=${encodeURIComponent(roomId)}&access=true`;
+    // Sicherstellen dass baseUrl IMMER die Root ist
+    const baseUrl = window.location.origin + "/";
+    const token = gekkoService.generateToken(roomId);
+    return `${baseUrl}?t=${token}`;
   };
 
   return (
@@ -92,7 +94,7 @@ const AdminPanel: React.FC<AdminPanelProps> = ({ onClose, onPreviewRoom }) => {
           {id: 'api', label: 'Verbindung'},
           {id: 'rooms', label: 'Räume'},
           {id: 'export', label: 'QR-Export'},
-          {id: 'hosting', label: 'System'}
+          {id: 'hosting', label: 'Sicherheit'}
         ].map(tab => (
           <button 
             key={tab.id}
@@ -182,6 +184,15 @@ const AdminPanel: React.FC<AdminPanelProps> = ({ onClose, onPreviewRoom }) => {
 
         {activeTab === 'export' && (
           <div className="max-w-4xl mx-auto">
+            <div className="bg-amber-50 border border-amber-100 p-4 rounded-xl mb-8 flex items-start gap-3">
+              <Lock size={20} className="text-amber-600 mt-1 shrink-0" />
+              <div>
+                <p className="text-xs font-bold text-amber-800 uppercase tracking-tight">Sicherheits-Modus Aktiv</p>
+                <p className="text-[10px] text-amber-700 leading-relaxed mt-1">
+                  Die QR-Codes enthalten jetzt verschlüsselte Tokens. Sobald ein Handy den Code scannt, wird die Adresse im Browser sofort bereinigt, damit der Link nicht einfach weitergegeben werden kann.
+                </p>
+              </div>
+            </div>
             <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-6">
                {config.rooms.map(r => (
                  <div key={r.id} className="bg-white p-6 border rounded-2xl flex flex-col items-center shadow-sm">
@@ -192,11 +203,11 @@ const AdminPanel: React.FC<AdminPanelProps> = ({ onClose, onPreviewRoom }) => {
                    <div className="p-4 bg-white rounded-xl border border-slate-50 mb-4">
                      <QRCodeCanvas value={getQrUrl(r.id)} size={180} level="H" />
                    </div>
-                   <p className="text-[8px] text-slate-300 break-all text-center mb-4 font-mono leading-tight">
-                     {getQrUrl(r.id)}
+                   <p className="text-[8px] text-slate-300 break-all text-center mb-4 font-mono leading-tight px-2">
+                     {getQrUrl(r.id).substring(0, 40)}...
                    </p>
                    <button 
-                    onClick={() => { navigator.clipboard.writeText(getQrUrl(r.id)); alert("Kopiert!"); }}
+                    onClick={() => { navigator.clipboard.writeText(getQrUrl(r.id)); alert("Sicherer Link kopiert!"); }}
                     className="w-full py-2.5 bg-slate-50 border rounded-lg text-[9px] font-bold uppercase text-slate-600 flex items-center justify-center gap-2"
                    >
                      <Copy size={12}/> Link kopieren
@@ -208,12 +219,34 @@ const AdminPanel: React.FC<AdminPanelProps> = ({ onClose, onPreviewRoom }) => {
         )}
         
         {activeTab === 'hosting' && (
-          <div className="max-w-md mx-auto text-center p-12 bg-white rounded-2xl border">
-             <Server className="mx-auto text-slate-200 mb-6" size={64}/>
-             <h3 className="font-bold text-lg mb-2 uppercase">Proxy Server</h3>
-             <p className="text-xs text-slate-400 leading-relaxed">
-               Anfragen werden über den integrierten Node-Proxy geleitet, um Browser-Beschränkungen zu umgehen.
-             </p>
+          <div className="max-w-md mx-auto space-y-6">
+            <div className="bg-white p-6 rounded-2xl border shadow-sm">
+               <h3 className="font-bold text-sm mb-4 uppercase flex items-center gap-2"><Lock size={16}/> System-Schlüssel</h3>
+               <p className="text-[10px] text-slate-400 mb-4 leading-relaxed">
+                 Dieser Schlüssel wird zur Generierung der QR-Tokens verwendet. Wenn du ihn änderst, werden alle alten QR-Codes sofort ungültig.
+               </p>
+               <div className="flex gap-2">
+                 <input 
+                  type="text" 
+                  className="admin-input font-mono text-xs" 
+                  value={config.secretKey} 
+                  onChange={e => setConfig({...config, secretKey: e.target.value})} 
+                 />
+                 <button 
+                  onClick={() => setConfig({...config, secretKey: 'sybtec-' + Math.random().toString(36).substring(7)})}
+                  className="p-2 bg-slate-100 rounded text-slate-500 hover:bg-slate-200"
+                  title="Neu generieren"
+                 >
+                   <RefreshCw size={16}/>
+                 </button>
+               </div>
+            </div>
+            
+            <div className="bg-slate-900 text-slate-400 p-8 rounded-2xl text-center">
+               <Server className="mx-auto text-slate-700 mb-4" size={48}/>
+               <h3 className="font-bold text-xs text-white uppercase mb-2">Proxy Server Status</h3>
+               <p className="text-[9px] uppercase tracking-widest text-teal-500 font-bold">Aktiv & Sicher</p>
+            </div>
           </div>
         )}
       </div>

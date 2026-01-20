@@ -1,21 +1,22 @@
 
 export interface RoomDefinition {
-  id: string; // Eindeutige ID (z.B. u_0_0_1)
-  name: string; // Anzeigename (z.B. Wohnzimmer)
-  enabled: boolean; // In der App sichtbar/nutzbar?
-  category?: string; // Entspricht dem "page" Feld (z.B. EG, OG)
+  id: string; 
+  name: string; 
+  enabled: boolean; 
+  category?: string; 
 }
 
 export interface GekkoConfig {
   apiMode: 'local' | 'cloud';
   ip: string;
-  gekkoId: string; // Erforderlich für Cloud-Verbindung
+  gekkoId: string; 
   username: string;
-  password: string; // Im Cloud-Modus ist dies der API-Key
+  password: string; 
   useMock: boolean;
   rooms: RoomDefinition[];
   adminPassword?: string;
-  corsProxy?: string; // Optional: Proxy URL for CORS bypass
+  secretKey: string; // Neuer Schlüssel für QR-Sicherheit
+  corsProxy?: string; 
 }
 
 export interface GekkoStatus {
@@ -28,5 +29,5 @@ export interface GekkoStatus {
   betriebsart: string;
   feuchte: number;
   roomName: string;
-  category: string; // Entspricht dem "page" Feld in myGEKKO
+  category: string; 
 }

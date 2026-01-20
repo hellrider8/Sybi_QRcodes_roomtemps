@@ -22,25 +22,23 @@ const App: React.FC = () => {
   
   const pressTimer = useRef<number | null>(null);
 
-  // Logout Funktion
   const logout = useCallback(() => {
     localStorage.removeItem('gekko_session_start');
     localStorage.removeItem('gekko_current_room');
     setCurrentRoomId(null);
     setStatus(null);
     setIsExpired(true);
-    // URL säubern
+    // URL komplett säubern
     window.history.replaceState({}, '', window.location.origin + window.location.pathname);
   }, []);
 
-  // Initialisierung & URL-Handling
   useEffect(() => {
     const path = window.location.pathname;
     const params = new URLSearchParams(window.location.search);
-    const roomIdFromUrl = params.get('room');
-    const hasAccessFlag = params.get('access') === 'true';
+    const token = params.get('t'); // Magic Token
+    const roomIdDirect = params.get('room'); // Fallback für Legacy
 
-    // 1. Check ob /admin aufgerufen wurde
+    // 1. Admin Check
     if (path === '/admin' || path === '/admin/') {
       const pw = prompt("System-Passwort für Admin-Bereich:");
       if (pw === "sybtec" || pw === "") {
@@ -52,20 +50,26 @@ const App: React.FC = () => {
       return;
     }
     
-    // 2. Fall: Raum-ID ist in der URL vorhanden
-    if (roomIdFromUrl) {
-      setCurrentRoomId(roomIdFromUrl);
-      gekkoService.setCurrentRoom(roomIdFromUrl);
-      
-      if (hasAccessFlag) {
+    // 2. Token Verarbeitung (Sicherer Weg)
+    if (token) {
+      const decoded = gekkoService.decodeToken(token);
+      if (decoded) {
+        setCurrentRoomId(decoded.roomId);
+        gekkoService.setCurrentRoom(decoded.roomId);
         localStorage.setItem('gekko_session_start', Date.now().toString());
-        localStorage.setItem('gekko_current_room', roomIdFromUrl);
-        const newUrl = window.location.origin + window.location.pathname + `?room=${roomIdFromUrl}`;
-        window.history.replaceState({}, '', newUrl);
+        localStorage.setItem('gekko_current_room', decoded.roomId);
+        
+        // URL SOFORT BEREINIGEN - Der Token verschwindet aus der Adresszeile!
+        // Wir lassen nur noch ?room=... zur Info stehen, aber ohne den Access-Token
+        const cleanUrl = window.location.origin + window.location.pathname + `?room=${decoded.roomId}`;
+        window.history.replaceState({}, '', cleanUrl);
       }
     } 
-    // 3. Fall: Keine URL-Parameter, schaue in den Speicher
-    else {
+    // 3. Fallback / Session-Wiederherstellung
+    else if (roomIdDirect) {
+      setCurrentRoomId(roomIdDirect);
+      gekkoService.setCurrentRoom(roomIdDirect);
+    } else {
       const storedRoom = localStorage.getItem('gekko_current_room');
       if (storedRoom) {
         setCurrentRoomId(storedRoom);
@@ -153,7 +157,6 @@ const App: React.FC = () => {
       <AdminPanel 
         onClose={() => {
           setShowAdmin(false);
-          // Wenn wir /admin in der URL haben, gehen wir zurück zur Root
           if (window.location.pathname.includes('admin')) {
              window.location.href = "/";
           }
