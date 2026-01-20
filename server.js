@@ -3,42 +3,56 @@ const express = require('express');
 const { createProxyMiddleware } = require('http-proxy-middleware');
 const path = require('path');
 const cors = require('cors');
+const esbuild = require('esbuild');
+const fs = require('fs');
 
 const app = express();
 const PORT = process.env.PORT || 3000;
 
-// Erlaube CORS für alle Anfragen
 app.use(cors());
 
-// Statische Dateien aus dem aktuellen Verzeichnis servieren
+// Middleware für On-the-fly Transpilierung von .ts und .tsx Dateien
+app.get(['/*.tsx', '/*.ts'], async (req, res, next) => {
+    const filePath = path.join(__dirname, req.path);
+    if (fs.existsSync(filePath)) {
+        try {
+            const content = fs.readFileSync(filePath, 'utf8');
+            const result = await esbuild.transform(content, {
+                loader: req.path.endsWith('tsx') ? 'tsx' : 'ts',
+                target: 'esnext',
+                format: 'esm',
+            });
+            res.type('application/javascript').send(result.code);
+        } catch (err) {
+            res.status(500).send(`Transpilation Error: ${err.message}`);
+        }
+    } else {
+        next();
+    }
+});
+
+// Statische Dateien servieren (für Bilder, HTML, CSS)
 app.use(express.static(__dirname));
 
-/**
- * Der integrierte Proxy-Endpunkt.
- * Anfragen an /api/proxy?url=http://... werden an das myGEKKO weitergeleitet.
- */
+// Integrierter Gekko-Proxy
 app.use('/api/proxy', (req, res, next) => {
     const targetUrl = req.query.url;
-    if (!targetUrl) {
-        return res.status(400).send('Missing "url" parameter');
-    }
-
-    // Wir erstellen den Proxy dynamisch für die Ziel-URL
+    if (!targetUrl) return res.status(400).send('Missing "url" parameter');
     createProxyMiddleware({
         target: targetUrl,
         changeOrigin: true,
-        pathRewrite: (path, req) => '', // Entferne den lokalen Pfad komplett
-        onProxyRes: (proxyRes, req, res) => {
+        pathRewrite: () => '',
+        onProxyRes: (proxyRes) => {
             proxyRes.headers['Access-Control-Allow-Origin'] = '*';
         },
-        onError: (err, req, res) => {
+        onError: (err) => {
             console.error('Proxy Error:', err);
-            res.status(500).send('Proxy to myGEKKO failed');
+            res.status(500).send('Proxy failed');
         }
     })(req, res, next);
 });
 
-// Fallback für Single Page Application (liefert index.html bei unbekannten Pfaden)
+// SPA Fallback (für alle anderen Pfade index.html liefern)
 app.get('*', (req, res) => {
     res.sendFile(path.join(__dirname, 'index.html'));
 });
@@ -46,10 +60,9 @@ app.get('*', (req, res) => {
 app.listen(PORT, () => {
     console.log(`
 ==================================================
-  TEKKO RAUMREGELUNG - SERVER GESTARTET
+  TEKKO SERVER LÄUFT (TRANSPILE MODE)
 ==================================================
-  Frontend: http://localhost:${PORT}
-  Proxy:    Integriert unter /api/proxy
+  URL: http://localhost:${PORT}
 ==================================================
     `);
 });
