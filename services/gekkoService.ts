@@ -1,5 +1,5 @@
 
-import { GekkoStatus, GekkoConfig, RoomDefinition } from '../types';
+import { GekkoStatus, GekkoConfig, RoomDefinition } from '../types.ts';
 
 const STORAGE_KEY = 'gekko_full_config';
 
@@ -81,16 +81,10 @@ class GekkoService {
       finalUrl += `${connector}${queryParts.join('&')}`;
     }
     
-    /**
-     * NEUE LOGIK: Wenn wir im "Integrated Mode" sind (server.js), 
-     * nutzen wir unseren eigenen /api/proxy Endpunkt.
-     */
     if (this.config.apiMode === 'local') {
-      // Wenn wir lokal auf dem Server laufen, nutzen wir den internen Pfad
       return `/api/proxy?url=${encodeURIComponent(finalUrl)}`;
     }
 
-    // Fallback für manuelle Proxies oder Cloud
     const proxy = this.config.corsProxy?.trim();
     if (proxy && proxy.startsWith('http')) {
       const cleanProxy = proxy.endsWith('/') ? proxy : proxy + '/';
@@ -105,8 +99,6 @@ class GekkoService {
       'Accept': 'application/json'
     };
 
-    // Im integrierten Modus brauchen wir keine speziellen Header für den Proxy,
-    // da der Node-Server die Authorization für uns an das myGEKKO weiterreicht.
     if (this.config.apiMode === 'local') {
       const authString = `${this.config.username}:${this.config.password}`;
       headers['Authorization'] = 'Basic ' + btoa(authString);

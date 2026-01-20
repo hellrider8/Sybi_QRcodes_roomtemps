@@ -1,9 +1,8 @@
 
-// Added React import to fix namespace error
 import React, { useState, useEffect } from 'react';
 import { Save, Plus, Trash2, X, Settings, Shield, RefreshCw, Globe, Wifi, Eye, AlertCircle, CheckCircle2, Terminal, Copy, Server, Activity } from 'lucide-react';
-import { gekkoService } from '../services/gekkoService';
-import { RoomDefinition } from '../types';
+import { gekkoService } from '../services/gekkoService.ts';
+import { RoomDefinition } from '../types.ts';
 import { QRCodeCanvas } from 'qrcode.react';
 
 interface AdminPanelProps {
@@ -87,14 +86,6 @@ const AdminPanel: React.FC<AdminPanelProps> = ({ onClose, onPreviewRoom }) => {
                 </div>
               </div>
 
-              <div className="pt-4 border-t">
-                <label className="text-[10px] font-bold uppercase text-slate-400 block mb-1 flex items-center gap-2">
-                  <Globe size={10}/> Proxy URL (aus Linux-Container)
-                </label>
-                <input type="text" placeholder="http://192.168.x.x:8080" className="admin-input border-[#00828c]/30" value={config.corsProxy} onChange={e => setConfig({...config, corsProxy: e.target.value})} />
-                <p className="text-[9px] text-slate-400 mt-1 italic uppercase">Zwingend erforderlich für lokale IP-Steuerung im Browser.</p>
-              </div>
-
               <button onClick={testConnection} disabled={isTesting} className="w-full py-3 bg-slate-800 text-white rounded text-xs font-bold flex items-center justify-center gap-2 hover:bg-slate-700 transition-colors">
                 {isTesting ? <RefreshCw className="animate-spin" size={14}/> : <Wifi size={14}/>}
                 Verbindung Testen
@@ -116,51 +107,13 @@ const AdminPanel: React.FC<AdminPanelProps> = ({ onClose, onPreviewRoom }) => {
               <div className="flex items-center gap-3 mb-4">
                 <div className="p-2 bg-slate-100 rounded-lg text-slate-600"><Terminal size={20}/></div>
                 <div>
-                  <h3 className="font-bold text-sm uppercase">Linux Container Setup</h3>
-                  <p className="text-[10px] text-slate-400 uppercase">Installation des CORS-Proxys</p>
+                  <h3 className="font-bold text-sm uppercase">Linux Container Status</h3>
+                  <p className="text-[10px] text-slate-400 uppercase">Integrierter Proxy Aktiv</p>
                 </div>
               </div>
-
-              <div className="space-y-4">
-                <div className="space-y-2">
-                  <p className="text-[11px] font-medium text-slate-600">1. Node.js & NPM installieren:</p>
-                  <div className="bg-slate-900 text-green-400 p-3 rounded font-mono text-[11px] flex justify-between items-center group">
-                    <span>apt update && apt install nodejs npm -y</span>
-                    <button onClick={() => copyToClipboard('apt update && apt install nodejs npm -y')} className="opacity-0 group-hover:opacity-100 p-1 hover:bg-white/10 rounded"><Copy size={12}/></button>
-                  </div>
-                </div>
-
-                <div className="space-y-2">
-                  <p className="text-[11px] font-medium text-slate-600">2. Proxy installieren:</p>
-                  <div className="bg-slate-900 text-green-400 p-3 rounded font-mono text-[11px] flex justify-between items-center group">
-                    <span>npm install -g cors-anywhere</span>
-                    <button onClick={() => copyToClipboard('npm install -g cors-anywhere')} className="opacity-0 group-hover:opacity-100 p-1 hover:bg-white/10 rounded"><Copy size={12}/></button>
-                  </div>
-                </div>
-
-                <div className="space-y-2">
-                  <p className="text-[11px] font-medium text-slate-600">3. Proxy starten (Dauerbetrieb):</p>
-                  <div className="bg-slate-900 text-green-400 p-3 rounded font-mono text-[11px] flex justify-between items-center group">
-                    <span>cors-anywhere 0.0.0.0:8080</span>
-                    <button onClick={() => copyToClipboard('cors-anywhere 0.0.0.0:8080')} className="opacity-0 group-hover:opacity-100 p-1 hover:bg-white/10 rounded"><Copy size={12}/></button>
-                  </div>
-                </div>
-              </div>
-            </div>
-
-            <div className="bg-[#00828c]/5 border border-[#00828c]/20 p-6 rounded text-slate-700">
-               <div className="flex items-center gap-3 mb-2 text-[#00828c]">
-                 <Server size={18}/>
-                 <h4 className="text-xs font-bold uppercase">Pro-Tipp: Autostart</h4>
-               </div>
-               <p className="text-[11px] leading-relaxed">
-                 Nutze <b>pm2</b> im Container, damit der Proxy nach einem Neustart automatisch wieder läuft:
-               </p>
-               <div className="bg-slate-800 text-slate-300 p-3 rounded font-mono text-[10px] mt-3">
-                 npm install -g pm2<br/>
-                 pm2 start "cors-anywhere 0.0.0.0:8080" --name proxy<br/>
-                 pm2 save
-               </div>
+              <p className="text-[11px] leading-relaxed text-slate-600">
+                Du nutzt bereits den <b>All-in-One Server</b>. Ein externer <code>cors-anywhere</code> Container ist nicht mehr nötig. Der Server leitet Anfragen automatisch über den internen Endpunkt <code>/api/proxy</code> weiter.
+              </p>
             </div>
           </div>
         )}
