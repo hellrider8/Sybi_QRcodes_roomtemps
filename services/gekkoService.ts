@@ -81,17 +81,8 @@ class GekkoService {
       finalUrl += `${connector}${queryParts.join('&')}`;
     }
     
-    if (this.config.apiMode === 'local') {
-      return `/api/proxy?url=${encodeURIComponent(finalUrl)}`;
-    }
-
-    const proxy = this.config.corsProxy?.trim();
-    if (proxy && proxy.startsWith('http')) {
-      const cleanProxy = proxy.endsWith('/') ? proxy : proxy + '/';
-      return `${cleanProxy}${finalUrl}`;
-    }
-
-    return finalUrl;
+    // IMMER den internen Proxy nutzen, um CORS-Probleme im Browser zu vermeiden
+    return `/api/proxy?url=${encodeURIComponent(finalUrl)}`;
   }
 
   private getFetchOptions(): RequestInit {
@@ -118,9 +109,13 @@ class GekkoService {
     try {
       const response = await fetch(url, this.getFetchOptions());
       if (response.ok) return { success: true, message: "Verbindung erfolgreich!" };
-      return { success: false, message: `Fehler: HTTP ${response.status}` };
+      
+      if (response.status === 401 || response.status === 403) {
+        return { success: false, message: "Zugriff verweigert (Benutzer/Key falsch?)" };
+      }
+      return { success: false, message: `Server Fehler: HTTP ${response.status}` };
     } catch (e: any) {
-      return { success: false, message: "Nicht erreichbar (IP im Backend korrekt?)" };
+      return { success: false, message: "Server nicht erreichbar. Prüfe ID/IP oder Internetverbindung." };
     }
   }
 

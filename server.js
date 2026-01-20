@@ -13,7 +13,6 @@ app.use(cors());
 
 // Middleware für On-the-fly Transpilierung - fängt alle .ts und .tsx Anfragen ab
 app.get(['/**/*.tsx', '/**/*.ts', '/*.tsx', '/*.ts'], async (req, res, next) => {
-    // Entferne Query-Parameter falls vorhanden
     const cleanPath = req.path;
     const filePath = path.join(__dirname, cleanPath);
 
@@ -24,7 +23,7 @@ app.get(['/**/*.tsx', '/**/*.ts', '/*.tsx', '/*.ts'], async (req, res, next) => 
                 loader: cleanPath.endsWith('tsx') ? 'tsx' : 'ts',
                 target: 'esnext',
                 format: 'esm',
-                jsx: 'automatic', // Wichtig für React 18/19 ohne explizites React-Import
+                jsx: 'automatic',
             });
             res.type('application/javascript').send(result.code);
         } catch (err) {
@@ -36,10 +35,9 @@ app.get(['/**/*.tsx', '/**/*.ts', '/*.tsx', '/*.ts'], async (req, res, next) => 
     }
 });
 
-// Statische Dateien (Bilder, CSS)
 app.use(express.static(__dirname));
 
-// Integrierter Gekko-Proxy
+// Integrierter Gekko-Proxy für CORS-Umgehung
 app.use('/api/proxy', (req, res, next) => {
     const targetUrl = req.query.url;
     if (!targetUrl) return res.status(400).send('Missing "url" parameter');
@@ -57,7 +55,6 @@ app.use('/api/proxy', (req, res, next) => {
     })(req, res, next);
 });
 
-// SPA Fallback
 app.get('*', (req, res) => {
     res.sendFile(path.join(__dirname, 'index.html'));
 });
@@ -65,10 +62,10 @@ app.get('*', (req, res) => {
 app.listen(PORT, () => {
     console.log(`
 ==================================================
-  TEKKO SERVER LÄUFT
+  TEKKO SERVER LÄUFT (FINAL VERSION)
 ==================================================
   URL: http://localhost:${PORT}
-  Modus: On-the-fly Transpile (esbuild)
+  Proxy: Aktiv (/api/proxy)
 ==================================================
     `);
 });

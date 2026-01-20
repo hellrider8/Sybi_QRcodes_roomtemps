@@ -8,7 +8,6 @@ import ExpiredScreen from './components/ExpiredScreen.tsx';
 import AdminPanel from './components/AdminPanel.tsx';
 import { gekkoService } from './services/gekkoService.ts';
 import { GekkoStatus } from './types.ts';
-import { Bug, AlertTriangle } from 'lucide-react';
 
 const SESSION_DURATION_MS = 15 * 60 * 1000;
 const POLLING_INTERVAL_MS = 10000;
@@ -20,8 +19,6 @@ const App: React.FC = () => {
   const [showAdmin, setShowAdmin] = useState(false);
   const [currentRoomId, setCurrentRoomId] = useState<string | null>(null);
   const [isPreview, setIsPreview] = useState(false);
-  const [rawDebug, setRawDebug] = useState<string>("");
-  const [isRateLimited, setIsRateLimited] = useState(false);
   
   const pressTimer = useRef<number | null>(null);
 
@@ -79,11 +76,9 @@ const App: React.FC = () => {
     try {
       const data = await gekkoService.fetchStatus(currentRoomId);
       setStatus(data);
-      setRawDebug(gekkoService.lastRawStatus);
-      setIsRateLimited(false);
       setLoading(false);
     } catch (e: any) {
-      if (e.message?.includes('429')) setIsRateLimited(true);
+      console.error("Fetch Error", e);
       setLoading(false);
     }
   }, [isExpired, isPreview, currentRoomId]);
@@ -116,18 +111,14 @@ const App: React.FC = () => {
     }
   };
 
-  const startPreview = (roomId: string) => {
-    setIsPreview(true);
-    setCurrentRoomId(roomId);
-    gekkoService.setCurrentRoom(roomId);
-    setShowAdmin(false);
-    setLoading(true);
-    refreshData();
-  };
+  if (showAdmin) return <AdminPanel onClose={() => setShowAdmin(false)} onPreviewRoom={(id) => { setIsPreview(true); setCurrentRoomId(id); gekkoService.setCurrentRoom(id); setShowAdmin(false); setLoading(true); refreshData(); }} />;
 
-  if (showAdmin) return <AdminPanel onClose={() => setShowAdmin(false)} onPreviewRoom={startPreview} />;
-
-  if (!currentRoomId || (isExpired && !isPreview)) return <div className="h-screen w-full max-w-md mx-auto relative overflow-hidden shadow-2xl"><ExpiredScreen /><div className="absolute top-0 left-0 w-full h-20" onMouseDown={handleAdminStart} onMouseUp={handleAdminEnd} onTouchStart={handleAdminStart} onTouchEnd={handleAdminEnd} /></div>;
+  if (!currentRoomId || (isExpired && !isPreview)) return (
+    <div className="h-screen w-full max-w-md mx-auto relative overflow-hidden shadow-2xl">
+      <ExpiredScreen />
+      <div className="absolute top-0 left-0 w-full h-20" onMouseDown={handleAdminStart} onMouseUp={handleAdminEnd} onTouchStart={handleAdminStart} onTouchEnd={handleAdminEnd} />
+    </div>
+  );
 
   if (loading || !status) return <div className="h-screen w-full flex items-center justify-center bg-[#e0e4e7]"><div className="w-10 h-10 border-2 border-t-transparent border-[#00828c] rounded-full animate-spin"></div></div>;
 
