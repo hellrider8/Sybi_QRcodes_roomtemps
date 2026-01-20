@@ -34,10 +34,10 @@ const Header: React.FC<HeaderProps> = ({ roomName, category, onBack, showBack, i
         <span className="text-[10px] font-extralight opacity-80 uppercase tracking-wider">{formatDate(time)}</span>
       </div>
 
-      <div className="flex-1 text-center">
-        <h1 className="text-xl font-extralight leading-none tracking-wide">Raumregelung</h1>
-        <p className="text-[11px] font-extralight mt-1 opacity-90 uppercase tracking-tighter">
-          <span className="font-semibold">{category || 'RÄUME'}</span> | <span>{roomName}</span>
+      <div className="flex-1 text-center px-12 sm:px-16">
+        <h1 className="text-[11px] font-extralight leading-none tracking-widest opacity-70 mb-1 uppercase">Raumregelung</h1>
+        <p className="text-[17px] font-extralight opacity-100 uppercase tracking-tight leading-tight">
+          <span className="font-bold">{category || 'RÄUME'}</span> | <span>{roomName}</span>
         </p>
       </div>
 
@@ -49,9 +49,9 @@ const Header: React.FC<HeaderProps> = ({ roomName, category, onBack, showBack, i
             title={isLogout ? "Abmelden" : "Zurück"}
           >
             {isLogout ? (
-              <LogOut size={24} strokeWidth={1.5} className="cursor-pointer text-white/70 hover:text-white" />
+              <LogOut size={22} strokeWidth={1.5} className="cursor-pointer text-white/70 hover:text-white" />
             ) : (
-              <ChevronLeft size={30} strokeWidth={1} className="cursor-pointer" />
+              <ChevronLeft size={28} strokeWidth={1} className="cursor-pointer" />
             )}
           </button>
         </div>

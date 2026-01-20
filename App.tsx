@@ -47,7 +47,7 @@ const App: React.FC = () => {
 
       if (path === '/admin' || path === '/admin/') {
         const pw = prompt("System-Passwort für Admin-Bereich:");
-        if (pw === "sybtec" || pw === "") setShowAdmin(true);
+        if (pw === "sybtec" || pw === "admin") setShowAdmin(true);
         else window.location.href = "/";
         setLoading(false);
         return;
@@ -155,8 +155,8 @@ const App: React.FC = () => {
   const handleAdminStart = () => {
     pressTimer.current = window.setTimeout(() => {
       const pw = prompt("System-Passwort:");
-      if (pw === "sybtec" || pw === "") setShowAdmin(true);
-    }, 2000);
+      if (pw === "sybtec" || pw === "admin") setShowAdmin(true);
+    }, 3000); // Längerer Press für mehr Sicherheit
   };
 
   const handleAdminEnd = () => {
@@ -168,7 +168,7 @@ const App: React.FC = () => {
 
   if (loading) {
     return (
-      <div className="h-screen w-full flex flex-col items-center justify-center bg-[#e0e4e7]">
+      <div className="min-h-screen w-full flex flex-col items-center justify-center bg-[#e0e4e7]">
         <div className="w-10 h-10 border-4 border-[#00828c]/20 border-t-[#00828c] rounded-full animate-spin"></div>
       </div>
     );
@@ -190,23 +190,30 @@ const App: React.FC = () => {
 
   if (!currentRoomId || isExpired) {
     return (
-      <div className="h-screen w-full max-w-md mx-auto relative overflow-hidden shadow-2xl bg-[#00828c]">
-        <ExpiredScreen reason={expiryReason} onAdminClick={() => setShowAdmin(true)} />
-        <div className="absolute top-0 left-0 w-full h-24" onMouseDown={handleAdminStart} onMouseUp={handleAdminEnd} onTouchStart={handleAdminStart} onTouchEnd={handleAdminEnd} />
+      <div className="min-h-screen w-full max-w-md mx-auto relative shadow-2xl bg-[#00828c]">
+        <ExpiredScreen reason={expiryReason} />
+        {/* Versteckter Admin-Trigger Bereich oben */}
+        <div 
+          className="absolute top-0 left-0 w-full h-32 z-50 cursor-default" 
+          onMouseDown={handleAdminStart} 
+          onMouseUp={handleAdminEnd} 
+          onTouchStart={handleAdminStart} 
+          onTouchEnd={handleAdminEnd} 
+        />
       </div>
     );
   }
 
   if (!status) {
     return (
-      <div className="h-screen w-full flex flex-col items-center justify-center bg-[#e0e4e7]">
+      <div className="min-h-screen w-full flex flex-col items-center justify-center bg-[#e0e4e7]">
         <span className="text-[10px] font-bold text-[#00828c] uppercase tracking-widest">Lade Status...</span>
       </div>
     );
   }
 
   return (
-    <div className="h-screen flex flex-col bg-[#e0e4e7] max-w-md mx-auto shadow-2xl relative overflow-hidden select-none">
+    <div className="min-h-screen flex flex-col bg-[#e0e4e7] max-w-md mx-auto shadow-2xl relative select-none">
       <div onMouseDown={handleAdminStart} onMouseUp={handleAdminEnd} onTouchStart={handleAdminStart} onTouchEnd={handleAdminEnd}>
         <Header 
           roomName={status.roomName} 
@@ -216,7 +223,7 @@ const App: React.FC = () => {
           isLogout={!isPreview}
         />
       </div>
-      <main className="flex-1 flex flex-col relative">
+      <main className="flex-1 flex flex-col relative pb-4">
         <MainControl soll={status.sollTemp} ist={status.istTemp} offset={status.offset} mode={status.betriebsart} onAdjust={handleTempAdjust} />
         <StatusLine regler={status.reglerPercent} ventilator={status.ventilatorState} />
         <Footer hauptMode={status.hauptbetriebsart} subMode={status.betriebsart} feuchte={status.feuchte} />

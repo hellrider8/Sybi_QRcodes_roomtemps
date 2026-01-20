@@ -1,13 +1,12 @@
 
 import React from 'react';
-import { QrCode, Lock, Settings, AlertTriangle, RefreshCw } from 'lucide-react';
+import { QrCode, Lock, AlertTriangle, RefreshCw } from 'lucide-react';
 
 interface ExpiredScreenProps {
   reason?: string;
-  onAdminClick?: () => void;
 }
 
-const ExpiredScreen: React.FC<ExpiredScreenProps> = ({ reason, onAdminClick }) => {
+const ExpiredScreen: React.FC<ExpiredScreenProps> = ({ reason }) => {
   const handleHardReset = () => {
     if (confirm("Möchten Sie alle lokalen Einstellungen auf diesem Gerät löschen? Dies behebt oft Probleme beim Scannen.")) {
       localStorage.clear();
@@ -40,16 +39,10 @@ const ExpiredScreen: React.FC<ExpiredScreenProps> = ({ reason, onAdminClick }) =
         
         <div className="flex gap-8 mt-4">
           <button 
-            onClick={onAdminClick}
-            className="text-[9px] uppercase tracking-widest text-white/40 hover:text-white transition-colors"
-          >
-            Backend
-          </button>
-          <button 
             onClick={handleHardReset}
             className="text-[9px] uppercase tracking-widest text-white/40 hover:text-white transition-colors flex items-center gap-1"
           >
-            <RefreshCw size={10} /> Reset App
+            <RefreshCw size={10} /> App Resetten
           </button>
         </div>
       </div>

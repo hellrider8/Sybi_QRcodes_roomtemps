@@ -36,16 +36,24 @@ const Footer: React.FC<FooterProps> = ({ hauptMode, subMode, feuchte }) => {
             <span className="text-sm font-light tracking-wider mr-2">{feuchte.toFixed(1)} % rF</span>
           </div>
 
-          {/* Sybtec Branding Watermark */}
-          <div className="pt-6 flex justify-center items-center">
-            <a 
-              href="https://www.sybtec.de/" 
-              target="_blank" 
-              rel="noopener noreferrer"
-              className="text-[9px] text-white/30 uppercase tracking-[0.3em] font-light hover:text-white/60 transition-colors"
-            >
-              powered by sybtec
-            </a>
+          {/* Sybtec Branding Watermark with Logo */}
+          <div className="pt-8 flex flex-col justify-center items-center gap-2">
+            <div className="flex items-center gap-2.5 opacity-25 hover:opacity-60 transition-opacity">
+               <svg width="22" height="22" viewBox="0 0 100 100" className="fill-white">
+                  {/* Clean Sybtec Symbol Style */}
+                  <path d="M50 5 L95 50 L50 95 L5 50 Z" stroke="white" strokeWidth="2" fill="none" />
+                  <path d="M50 20 L80 50 L50 80 L20 50 Z" fill="white" />
+                  <rect x="40" y="40" width="20" height="20" fill="#00828c" transform="rotate(45 50 50)" />
+               </svg>
+               <a 
+                href="https://www.sybtec.de/" 
+                target="_blank" 
+                rel="noopener noreferrer"
+                className="text-[9px] text-white uppercase tracking-[0.4em] font-light"
+               >
+                powered by sybtec
+               </a>
+            </div>
           </div>
 
         </div>
