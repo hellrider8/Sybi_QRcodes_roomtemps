@@ -81,7 +81,6 @@ class GekkoService {
       finalUrl += `${connector}${queryParts.join('&')}`;
     }
     
-    // IMMER den internen Proxy nutzen, um CORS-Probleme im Browser zu vermeiden
     return `/api/proxy?url=${encodeURIComponent(finalUrl)}`;
   }
 
@@ -115,7 +114,7 @@ class GekkoService {
       }
       return { success: false, message: `Server Fehler: HTTP ${response.status}` };
     } catch (e: any) {
-      return { success: false, message: "Server nicht erreichbar. Prüfe ID/IP oder Internetverbindung." };
+      return { success: false, message: "Server nicht erreichbar." };
     }
   }
 
@@ -135,11 +134,14 @@ class GekkoService {
     try {
       const response = await fetch(url, this.getFetchOptions());
       const rawData = await response.json();
+      
+      // Das Gekko-Objekt kann entweder direkt im Root oder unter "roomtemps" liegen
       const items = rawData.roomtemps || rawData;
       const rooms: RoomDefinition[] = [];
 
       for (const id in items) {
-        if (id.toLowerCase().startsWith('item')) {
+        // Wir nehmen alles, was ein Objekt ist und einen Namen hat
+        if (typeof items[id] === 'object' && items[id] !== null) {
           rooms.push({
             id: id,
             name: items[id].name || id,
@@ -148,8 +150,11 @@ class GekkoService {
           });
         }
       }
+      
+      console.log("Discovery results:", rooms);
       return { rooms, rawData, debugInfo: "Import erfolgreich" };
     } catch (e: any) {
+      console.error("Discovery error:", e);
       return { rooms: [], rawData: null, debugInfo: "Import fehlgeschlagen", error: e.message };
     }
   }
