@@ -1,113 +1,79 @@
-
 <!DOCTYPE html>
 <html lang="de">
-  <head>
+<head>
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover" />
     <title>TEKKO Raumregelung</title>
     <script src="https://cdn.tailwindcss.com"></script>
     <link href="https://fonts.googleapis.com/css2?family=Inter:wght@200;300;400;500;700&display=swap" rel="stylesheet">
     <style>
-      :root {
-        --app-height: 100%;
-      }
-      html, body {
-        padding: 0;
-        margin: 0;
-        width: 100%;
-        height: 100vh;
-        height: 100dvh; /* Dynamic viewport height for mobile browsers */
-        overflow: hidden;
-        position: fixed; /* Prevents scrolling the whole page */
-        touch-action: none; /* Prevents all gestures except what we explicitly allow */
-        -webkit-user-select: none;
-        user-select: none;
-        background-color: #e0e4e7;
-        font-family: 'Inter', -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
-        -webkit-font-smoothing: antialiased;
-        -moz-osx-font-smoothing: grayscale;
-        overscroll-behavior: none; /* Disables pull-to-refresh and bounce effects */
-      }
-      #root {
-        height: 100%;
-        width: 100%;
-        display: flex;
-        flex-direction: column;
-      }
-      .scrollable {
-        overflow-y: auto;
-        touch-action: pan-y; /* Allow vertical scrolling in specific areas only */
-        -webkit-overflow-scrolling: touch;
-      }
-      .admin-input {
-        background: #f3f4f6;
-        border: 1px solid #d1d5db;
-        border-radius: 4px;
-        padding: 8px 12px;
-        width: 100%;
-        color: #374151;
-        font-size: 14px;
-      }
-      .admin-label {
-        display: block;
-        font-size: 12px;
-        text-transform: uppercase;
-        letter-spacing: 0.05em;
-        color: #6b7280;
-        margin-bottom: 4px;
-        margin-top: 12px;
-      }
-      /* Ensure buttons don't zoom on double tap */
-      button {
-        touch-action: manipulation;
-      }
+        html, body { margin: 0; padding: 0; width: 100%; height: 100dvh; background-color: #e0e4e7; font-family: 'Inter', sans-serif; overflow: hidden; }
+        #root { height: 100%; }
     </style>
-  <script type="importmap">
-{
-  "imports": {
-    "react": "https://esm.sh/react@19.0.0",
-    "react-dom": "https://esm.sh/react-dom@19.0.0",
-    "react-dom/client": "https://esm.sh/react-dom@19.0.0/client",
-    "lucide-react": "https://esm.sh/lucide-react@0.460.0?external=react",
-    "qrcode.react": "https://esm.sh/qrcode.react@3.1.0?external=react",
-    "jszip": "https://esm.sh/jszip@3.10.1",
-    "file-saver": "https://esm.sh/file-saver@2.0.5",
-    "react-dom/": "https://esm.sh/react-dom@^19.2.3/",
-    "react/": "https://esm.sh/react@^19.2.3/"
-  }
-}
-</script>
-</head>
-  <body>
-    <div id="root"></div>
-  </body>
-<script type="module">
-      import React from 'react';
-      import { createRoot } from 'react-dom/client';
-      // Hier importieren wir die Icons und QR-Komponenten von deiner Liste oben
-      import { Thermometer, Settings } from 'lucide-react'; 
-
-      function App() {
-        return (
-          <div className="flex flex-col items-center justify-center h-full p-4">
-            <div className="bg-white p-8 rounded-3xl shadow-2xl text-center w-full max-w-sm">
-              <h1 className="text-2xl font-bold text-gray-800 mb-4">TEKKO Regelung</h1>
-              <div className="flex justify-center mb-4">
-                 <Thermometer size={64} className="text-blue-500" />
-              </div>
-              <div className="text-6xl font-light text-gray-900 mb-2">22.5°C</div>
-              <p className="text-gray-500 uppercase tracking-widest text-sm">Wohnzimmer</p>
-              
-              <button className="mt-8 bg-gray-100 p-3 rounded-full hover:bg-gray-200 transition-colors">
-                <Settings className="text-gray-600" />
-              </button>
-            </div>
-          </div>
-        );
-      }
-
-      const root = createRoot(document.getElementById('root'));
-      root.render(<App />);
+    <script type="importmap">
+    {
+        "imports": {
+            "react": "https://esm.sh/react@18.2.0",
+            "react-dom": "https://esm.sh/react-dom@18.2.0/client",
+            "lucide-react": "https://esm.sh/lucide-react@0.263.1?external=react"
+        }
+    }
     </script>
-  
+</head>
+<body>
+    <div id="root"></div>
+
+    <script type="module">
+        import React, { useState, useEffect } from 'react';
+        import { createRoot } from 'react-dom';
+        import { Thermometer, ThermometerSnowflake, Settings, QrCode } from 'lucide-react';
+
+        function App() {
+            const [temp, setTemp] = useState(21.5);
+            const urlParams = new URLSearchParams(window.location.search);
+            const raum = urlParams.get('raum') || 'Standardraum';
+
+            return (
+                <div className="flex items-center justify-center h-full p-6">
+                    <div className="bg-white p-8 rounded-[40px] shadow-xl text-center w-full max-w-sm border border-gray-100">
+                        <div className="flex justify-between items-center mb-8">
+                            <QrCode size={24} className="text-gray-400" />
+                            <Settings size={24} className="text-gray-400" />
+                        </div>
+                        
+                        <div className="room-label text-xs font-bold text-gray-400 uppercase tracking-[0.2em] mb-2">
+                            {raum}
+                        </div>
+                        
+                        <div className="flex justify-center items-center mb-6">
+                            <div className="relative">
+                                <Thermometer size={80} className="text-blue-500 relative z-10" />
+                                <div className="absolute inset-0 bg-blue-100 blur-2xl rounded-full opacity-50"></div>
+                            </div>
+                        </div>
+
+                        <div className="text-7xl font-light text-gray-800 mb-8 flex justify-center items-start">
+                            <span>{temp.toFixed(1)}</span>
+                            <span className="text-2xl mt-3 ml-1">°C</span>
+                        </div>
+
+                        <div className="flex gap-4">
+                            <button 
+                                onClick={() => setTemp(t => t - 0.5)}
+                                className="flex-1 bg-gray-100 py-4 rounded-2xl text-2xl font-bold text-gray-600 active:scale-95 transition-all"
+                            >-</button>
+                            <button 
+                                onClick={() => setTemp(t => t + 0.5)}
+                                className="flex-1 bg-blue-500 py-4 rounded-2xl text-2xl font-bold text-white shadow-lg shadow-blue-200 active:scale-95 transition-all"
+                            >+</button>
+                        </div>
+                    </div>
+                </div>
+            );
+        }
+
+        const root = createRoot(document.getElementById('root'));
+        root.render(React.createElement(App));
+    </script>
+</body>
 </html>
