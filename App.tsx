@@ -9,7 +9,6 @@ import AdminPanel from './components/AdminPanel.tsx';
 import { gekkoService } from './services/gekkoService.ts';
 import { GekkoStatus } from './types.ts';
 
-const SESSION_DURATION_MS = 15 * 60 * 1000;
 const POLLING_INTERVAL_MS = 10000;
 
 const App: React.FC = () => {
@@ -20,6 +19,7 @@ const App: React.FC = () => {
   const [showAdmin, setShowAdmin] = useState(false);
   const [currentRoomId, setCurrentRoomId] = useState<string | null>(null);
   const [isPreview, setIsPreview] = useState(false);
+  const [sessionDurationMinutes, setSessionDurationMinutes] = useState(15);
   
   const pressTimer = useRef<number | null>(null);
 
@@ -40,10 +40,8 @@ const App: React.FC = () => {
       const token = params.get('t');
       const roomIdDirect = params.get('room');
 
-      // ERST: Zentrale Config vom Server holen
-      await gekkoService.loadConfig();
-
-      gekkoService.logToServer('INFO', 'App Initialisierung (Server-Mode)...', { token: !!token, room: roomIdDirect });
+      const config = await gekkoService.loadConfig();
+      setSessionDurationMinutes(config.sessionDurationMinutes || 15);
 
       if (path === '/admin' || path === '/admin/') {
         const pw = prompt("System-Passwort für Admin-Bereich:");
@@ -102,20 +100,16 @@ const App: React.FC = () => {
       return;
     }
 
-    if (currentRoomId !== storedRoom) {
-      setIsExpired(true);
-      setExpiryReason("Raum-Wechsel erkannt");
-      return;
-    }
-
     const startTime = parseInt(startTimeStr, 10);
-    if (Date.now() - startTime > SESSION_DURATION_MS) {
+    const durationMs = sessionDurationMinutes * 60 * 1000;
+    
+    if (Date.now() - startTime > durationMs) {
       setIsExpired(true);
-      setExpiryReason("Sitzung abgelaufen (Sicherheits-Timeout)");
+      setExpiryReason(`Sitzung abgelaufen (${sessionDurationMinutes} Min.)`);
     } else {
       setIsExpired(false);
     }
-  }, [currentRoomId, isPreview, showAdmin, loading, isExpired]);
+  }, [currentRoomId, isPreview, showAdmin, loading, isExpired, sessionDurationMinutes]);
 
   useEffect(() => {
     if (!loading) {
@@ -130,9 +124,7 @@ const App: React.FC = () => {
     try {
       const data = await gekkoService.fetchStatus(currentRoomId);
       setStatus(data);
-    } catch (e: any) {
-      gekkoService.logToServer('ERROR', 'Status-Update fehlgeschlagen', { error: e.message });
-    }
+    } catch (e: any) {}
   }, [isExpired, loading, currentRoomId, showAdmin]);
 
   useEffect(() => {
@@ -156,7 +148,7 @@ const App: React.FC = () => {
     pressTimer.current = window.setTimeout(() => {
       const pw = prompt("System-Passwort:");
       if (pw === "sybtec" || pw === "admin") setShowAdmin(true);
-    }, 3000); // Längerer Press für mehr Sicherheit
+    }, 3000);
   };
 
   const handleAdminEnd = () => {
@@ -177,7 +169,11 @@ const App: React.FC = () => {
   if (showAdmin) {
     return (
       <AdminPanel 
-        onClose={() => setShowAdmin(false)} 
+        onClose={async () => {
+            const config = await gekkoService.loadConfig();
+            setSessionDurationMinutes(config.sessionDurationMinutes);
+            setShowAdmin(false);
+        }} 
         onPreviewRoom={(id) => { 
           setIsPreview(true); 
           setCurrentRoomId(id); 
@@ -190,11 +186,10 @@ const App: React.FC = () => {
 
   if (!currentRoomId || isExpired) {
     return (
-      <div className="min-h-screen w-full max-w-md mx-auto relative shadow-2xl bg-[#00828c]">
-        <ExpiredScreen reason={expiryReason} />
-        {/* Versteckter Admin-Trigger Bereich oben */}
+      <div className="min-h-screen w-full max-w-md mx-auto relative shadow-2xl bg-[#00828c] overflow-x-hidden">
+        <ExpiredScreen reason={expiryReason} sessionMinutes={sessionDurationMinutes} />
         <div 
-          className="absolute top-0 left-0 w-full h-32 z-50 cursor-default" 
+          className="absolute top-0 left-0 w-full h-32 z-50" 
           onMouseDown={handleAdminStart} 
           onMouseUp={handleAdminEnd} 
           onTouchStart={handleAdminStart} 
@@ -207,13 +202,13 @@ const App: React.FC = () => {
   if (!status) {
     return (
       <div className="min-h-screen w-full flex flex-col items-center justify-center bg-[#e0e4e7]">
-        <span className="text-[10px] font-bold text-[#00828c] uppercase tracking-widest">Lade Status...</span>
+        <span className="text-[10px] font-bold text-[#00828c] uppercase tracking-widest">Initialisierung...</span>
       </div>
     );
   }
 
   return (
-    <div className="min-h-screen flex flex-col bg-[#e0e4e7] max-w-md mx-auto shadow-2xl relative select-none">
+    <div className="min-h-screen flex flex-col bg-[#e0e4e7] max-w-md mx-auto shadow-2xl relative select-none overflow-x-hidden">
       <div onMouseDown={handleAdminStart} onMouseUp={handleAdminEnd} onTouchStart={handleAdminStart} onTouchEnd={handleAdminEnd}>
         <Header 
           roomName={status.roomName} 
@@ -223,7 +218,7 @@ const App: React.FC = () => {
           isLogout={!isPreview}
         />
       </div>
-      <main className="flex-1 flex flex-col relative pb-4">
+      <main className="flex-1 flex flex-col relative pb-4 overflow-y-auto overflow-x-hidden">
         <MainControl soll={status.sollTemp} ist={status.istTemp} offset={status.offset} mode={status.betriebsart} onAdjust={handleTempAdjust} />
         <StatusLine regler={status.reglerPercent} ventilator={status.ventilatorState} />
         <Footer hauptMode={status.hauptbetriebsart} subMode={status.betriebsart} feuchte={status.feuchte} />

@@ -36,20 +36,34 @@ const Footer: React.FC<FooterProps> = ({ hauptMode, subMode, feuchte }) => {
             <span className="text-sm font-light tracking-wider mr-2">{feuchte.toFixed(1)} % rF</span>
           </div>
 
-          {/* Sybtec Branding Watermark with Logo */}
+          {/* Sybtec Branding mit Original Logo-SVG (Interlaced S) */}
           <div className="pt-8 flex flex-col justify-center items-center gap-2">
-            <div className="flex items-center gap-2.5 opacity-25 hover:opacity-60 transition-opacity">
-               <svg width="22" height="22" viewBox="0 0 100 100" className="fill-white">
-                  {/* Clean Sybtec Symbol Style */}
-                  <path d="M50 5 L95 50 L50 95 L5 50 Z" stroke="white" strokeWidth="2" fill="none" />
-                  <path d="M50 20 L80 50 L50 80 L20 50 Z" fill="white" />
-                  <rect x="40" y="40" width="20" height="20" fill="#00828c" transform="rotate(45 50 50)" />
+            <div className="flex items-center gap-3 opacity-90 hover:opacity-100 transition-opacity cursor-pointer">
+               <svg width="32" height="32" viewBox="0 0 100 100" xmlns="http://www.w3.org/2000/svg">
+                  {/* Purple Interlaced Path Style (The stylized S) */}
+                  <path 
+                    d="M20,30 C20,10 80,10 80,30 L80,45 C80,55 70,55 70,55 L30,55 C20,55 20,65 20,75 L20,90" 
+                    fill="none" 
+                    stroke="#4B0082" 
+                    strokeWidth="14" 
+                    strokeLinecap="round"
+                    strokeLinejoin="round"
+                  />
+                  {/* Green Interlaced Path Style */}
+                  <path 
+                    d="M80,10 L80,25 C80,35 70,35 70,35 L30,35 C20,35 20,45 20,55 L20,70 C20,90 80,90 80,70" 
+                    fill="none" 
+                    stroke="#76C74D" 
+                    strokeWidth="14" 
+                    strokeLinecap="round"
+                    strokeLinejoin="round"
+                  />
                </svg>
                <a 
                 href="https://www.sybtec.de/" 
                 target="_blank" 
                 rel="noopener noreferrer"
-                className="text-[9px] text-white uppercase tracking-[0.4em] font-light"
+                className="text-[10px] text-white uppercase tracking-[0.4em] font-light"
                >
                 powered by sybtec
                </a>

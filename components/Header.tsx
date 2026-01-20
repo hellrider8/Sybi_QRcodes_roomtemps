@@ -35,9 +35,9 @@ const Header: React.FC<HeaderProps> = ({ roomName, category, onBack, showBack, i
       </div>
 
       <div className="flex-1 text-center px-12 sm:px-16">
-        <h1 className="text-[11px] font-extralight leading-none tracking-widest opacity-70 mb-1 uppercase">Raumregelung</h1>
-        <p className="text-[17px] font-extralight opacity-100 uppercase tracking-tight leading-tight">
-          <span className="font-bold">{category || 'RÄUME'}</span> | <span>{roomName}</span>
+        <h1 className="text-[10px] font-extralight leading-none tracking-[0.2em] opacity-70 mb-1 uppercase">Raumregelung</h1>
+        <p className="text-[20px] font-bold opacity-100 uppercase tracking-tight leading-tight">
+          <span className="font-extralight opacity-80">{category || 'RÄUME'}</span> | <span>{roomName}</span>
         </p>
       </div>
 

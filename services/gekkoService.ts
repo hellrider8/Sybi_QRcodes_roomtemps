@@ -18,7 +18,8 @@ class GekkoService {
     useMock: true,
     secretKey: 'sybtec-static-access-key-2024',
     corsProxy: '',
-    rooms: [] 
+    rooms: [],
+    sessionDurationMinutes: 15 // Standardwert
   };
 
   private currentRoomId: string = '';
@@ -37,12 +38,13 @@ class GekkoService {
     } catch (e) {}
   }
 
-  // Lädt die Config vom Server (config.json)
   async loadConfig(): Promise<GekkoConfig> {
     try {
       const response = await fetch('/api/config');
       if (response.ok) {
         this.config = await response.json();
+        // Fallback für alte configs ohne das Feld
+        if (!this.config.sessionDurationMinutes) this.config.sessionDurationMinutes = 15;
       }
     } catch (e) {
       console.error("Fehler beim Laden der Server-Config", e);
@@ -50,7 +52,6 @@ class GekkoService {
     return this.config;
   }
 
-  // Speichert die Config auf dem Server
   async saveConfig() {
     try {
       await fetch('/api/config', {
@@ -72,7 +73,6 @@ class GekkoService {
     await this.saveConfig();
   }
 
-  // Token ist jetzt schlanker, da die API-Daten vom Server kommen
   generateToken(roomId: string): string {
     const payload = JSON.stringify({
       r: roomId,
@@ -90,7 +90,6 @@ class GekkoService {
       const decodedStr = atob(base64);
       const data = JSON.parse(decodedStr);
       
-      // Sicherheits-Check
       if (data.s && data.s !== this.config.secretKey) {
         this.logToServer('ERROR', 'Token-Schlüssel passt nicht zur Server-Config', { tokenKey: data.s });
         return null;

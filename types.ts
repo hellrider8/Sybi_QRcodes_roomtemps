@@ -15,8 +15,9 @@ export interface GekkoConfig {
   useMock: boolean;
   rooms: RoomDefinition[];
   adminPassword?: string;
-  secretKey: string; // Neuer Schlüssel für QR-Sicherheit
+  secretKey: string; 
   corsProxy?: string; 
+  sessionDurationMinutes: number; // Neu: Konfigurierbare Dauer
 }
 
 export interface GekkoStatus {

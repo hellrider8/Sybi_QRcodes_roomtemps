@@ -1,9 +1,10 @@
 
 import React, { useState, useEffect } from 'react';
-import { Save, Plus, Trash2, X, Settings, Shield, RefreshCw, Globe, Wifi, Eye, AlertCircle, CheckCircle2, Terminal, Copy, Server, Activity, Search, Hash, QrCode as QrIcon, Lock } from 'lucide-react';
+import { Save, Plus, Trash2, X, Settings, Shield, RefreshCw, Globe, Wifi, Eye, AlertCircle, CheckCircle2, Terminal, Copy, Server, Activity, Search, Hash, QrCode as QrIcon, Lock, Clock, Download, FileArchive } from 'lucide-react';
 import { gekkoService } from '../services/gekkoService.ts';
 import { RoomDefinition } from '../types.ts';
 import { QRCodeCanvas } from 'qrcode.react';
+import JSZip from 'jszip';
 
 interface AdminPanelProps {
   onClose: () => void;
@@ -16,15 +17,15 @@ const AdminPanel: React.FC<AdminPanelProps> = ({ onClose, onPreviewRoom }) => {
   const [isTesting, setIsTesting] = useState(false);
   const [isDiscovering, setIsDiscovering] = useState(false);
   const [testResult, setTestResult] = useState<{success?: boolean, msg?: string}>({});
+  const [isExporting, setIsExporting] = useState(false);
 
-  const handleSave = () => {
-    gekkoService.setConfig(config);
+  const handleSave = async () => {
+    await gekkoService.setConfig(config);
     alert("Einstellungen wurden gespeichert.");
   };
 
   const copyToClipboard = (text: string) => {
     try {
-      // Fallback für Browser ohne Clipboard API oder ohne HTTPS
       const textArea = document.createElement("textarea");
       textArea.value = text;
       document.body.appendChild(textArea);
@@ -75,10 +76,42 @@ const AdminPanel: React.FC<AdminPanelProps> = ({ onClose, onPreviewRoom }) => {
   };
 
   const getQrUrl = (roomId: string) => {
-    // Erzwingt die Basis-URL ohne Pfade
     const baseUrl = window.location.protocol + "//" + window.location.host + "/";
     const token = gekkoService.generateToken(roomId);
     return `${baseUrl}?t=${token}`;
+  };
+
+  const exportAllQrCodes = async () => {
+    setIsExporting(true);
+    try {
+      const zip = new JSZip();
+      const canvases = document.querySelectorAll('.qr-export-container canvas');
+      
+      if (canvases.length === 0) {
+        alert("Bitte erst den Export-Tab öffnen, damit die Codes generiert werden.");
+        setIsExporting(false);
+        return;
+      }
+
+      canvases.forEach((canvas: any, index) => {
+        const roomName = canvas.getAttribute('data-room-name') || `Raum_${index + 1}`;
+        const imageData = canvas.toDataURL("image/png").split(',')[1];
+        zip.file(`${roomName}.png`, imageData, {base64: true});
+      });
+
+      const content = await zip.generateAsync({type: "blob"});
+      const url = window.URL.createObjectURL(content);
+      const link = document.createElement('a');
+      link.href = url;
+      link.download = "TEKKO_QR_Codes.zip";
+      link.click();
+      window.URL.revokeObjectURL(url);
+    } catch (error) {
+      console.error("Export Error:", error);
+      alert("Fehler beim Exportieren.");
+    } finally {
+      setIsExporting(false);
+    }
   };
 
   return (
@@ -176,15 +209,34 @@ const AdminPanel: React.FC<AdminPanelProps> = ({ onClose, onPreviewRoom }) => {
         )}
 
         {activeTab === 'export' && (
-          <div className="max-w-4xl mx-auto">
+          <div className="max-w-4xl mx-auto space-y-8">
+            <div className="flex justify-between items-center mb-6">
+              <h3 className="text-sm font-bold uppercase text-slate-800">QR-Code Katalog</h3>
+              <button 
+                onClick={exportAllQrCodes} 
+                disabled={isExporting}
+                className="bg-[#00828c] text-white px-6 py-2.5 rounded-lg text-[10px] font-bold uppercase flex items-center gap-2 shadow-md hover:bg-[#006a72] transition-all disabled:opacity-50"
+              >
+                {isExporting ? <RefreshCw size={14} className="animate-spin" /> : <FileArchive size={14} />} 
+                Alle als ZIP exportieren
+              </button>
+            </div>
+
             <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-6">
                {config.rooms.map(r => (
                  <div key={r.id} className="bg-white p-6 border rounded-2xl flex flex-col items-center shadow-sm">
                    <div className="w-full text-center mb-4 border-b pb-2">
                      <span className="text-xs font-bold uppercase text-[#00828c]">{r.name}</span>
                    </div>
-                   <div className="p-4 bg-white rounded-xl border border-slate-100 mb-4">
-                     <QRCodeCanvas value={getQrUrl(r.id)} size={180} level="H" />
+                   <div className="p-4 bg-white rounded-xl border border-slate-100 mb-4 qr-export-container">
+                     <QRCodeCanvas 
+                        value={getQrUrl(r.id)} 
+                        size={180} 
+                        level="H" 
+                        // Wir übergeben das Attribut direkt an das Canvas für den Export-Loop
+                        includeMargin={true}
+                        {...({"data-room-name": r.name} as any)}
+                      />
                    </div>
                    <button 
                     onClick={() => copyToClipboard(getQrUrl(r.id))}
@@ -203,8 +255,7 @@ const AdminPanel: React.FC<AdminPanelProps> = ({ onClose, onPreviewRoom }) => {
             <div className="bg-white p-6 rounded-2xl border shadow-sm">
                <h3 className="font-bold text-sm mb-4 uppercase flex items-center gap-2"><Lock size={16}/> Sicherheitsschlüssel</h3>
                <p className="text-[10px] text-slate-400 mb-4 leading-relaxed">
-                 Dieser Schlüssel muss auf dem Gerät, das den QR-Code erstellt (PC), und dem Gerät, das ihn scannt (Handy), identisch sein. 
-                 Speichere nach der Änderung ab, bevor du neue QR-Codes erstellst.
+                 Dieser Schlüssel muss auf dem Server und beim Token-Check identisch sein. 
                </p>
                <div className="flex gap-2">
                  <input 
@@ -216,10 +267,27 @@ const AdminPanel: React.FC<AdminPanelProps> = ({ onClose, onPreviewRoom }) => {
                  <button 
                   onClick={() => setConfig({...config, secretKey: 'sybtec-' + Math.random().toString(36).substring(7)})}
                   className="p-2 bg-slate-100 rounded text-slate-500 hover:bg-slate-200"
-                  title="Neu generieren"
                  >
                    <RefreshCw size={16}/>
                  </button>
+               </div>
+            </div>
+
+            <div className="bg-white p-6 rounded-2xl border shadow-sm">
+               <h3 className="font-bold text-sm mb-4 uppercase flex items-center gap-2"><Clock size={16}/> Sitzungsdauer</h3>
+               <p className="text-[10px] text-slate-400 mb-4 leading-relaxed">
+                 Dauer in Minuten, bis ein QR-Code erneut gescannt werden muss.
+               </p>
+               <div className="flex items-center gap-4">
+                 <input 
+                  type="number" 
+                  className="admin-input w-24 text-center" 
+                  value={config.sessionDurationMinutes} 
+                  onChange={e => setConfig({...config, sessionDurationMinutes: parseInt(e.target.value) || 1})} 
+                  min="1"
+                  max="1440"
+                 />
+                 <span className="text-xs font-bold text-slate-500 uppercase tracking-widest">Minuten</span>
                </div>
             </div>
           </div>
@@ -227,7 +295,7 @@ const AdminPanel: React.FC<AdminPanelProps> = ({ onClose, onPreviewRoom }) => {
       </div>
 
       <div className="p-4 sm:p-6 border-t flex justify-end gap-3 bg-white">
-        <button onClick={onClose} className="px-6 py-2.5 text-xs font-bold text-slate-400 uppercase">Abbrechen</button>
+        <button onClick={onClose} className="px-6 py-2.5 text-xs font-bold text-slate-400 uppercase">Schließen</button>
         <button onClick={handleSave} className="px-10 py-2.5 bg-[#00828c] text-white rounded-lg text-xs font-bold uppercase shadow-lg hover:bg-[#006a72] transition-all">Speichern</button>
       </div>
     </div>
