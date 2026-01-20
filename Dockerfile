@@ -1,0 +1,22 @@
+FROM node:20-slim
+
+# Arbeitsverzeichnis festlegen
+WORKDIR /usr/src/app
+
+# System-Abhängigkeiten für esbuild (falls nötig)
+RUN apt-get update && apt-get install -y ca-certificates && rm -rf /var/lib/apt/lists/*
+
+# Abhängigkeiten kopieren
+COPY package*.json ./
+
+# Nur Produktions-Abhängigkeiten installieren
+RUN npm install --production
+
+# Quellcode kopieren
+COPY . .
+
+# Cloud Run erwartet standardmäßig Port 8080
+EXPOSE 8080
+
+# Startbefehl
+CMD [ "node", "server.js" ]
