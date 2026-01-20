@@ -16,6 +16,7 @@ const App: React.FC = () => {
   const [status, setStatus] = useState<GekkoStatus | null>(null);
   const [loading, setLoading] = useState(true);
   const [isExpired, setIsExpired] = useState(false);
+  const [expiryReason, setExpiryReason] = useState<string>("");
   const [showAdmin, setShowAdmin] = useState(false);
   const [currentRoomId, setCurrentRoomId] = useState<string | null>(null);
   const [isPreview, setIsPreview] = useState(false);
@@ -28,74 +29,90 @@ const App: React.FC = () => {
     setCurrentRoomId(null);
     setStatus(null);
     setIsExpired(true);
+    setExpiryReason("Abgemeldet");
     window.history.replaceState({}, '', window.location.origin + window.location.pathname);
   }, []);
 
   useEffect(() => {
-    const path = window.location.pathname;
-    const params = new URLSearchParams(window.location.search);
-    const token = params.get('t');
-    const roomIdDirect = params.get('room');
+    const init = async () => {
+      const path = window.location.pathname;
+      const params = new URLSearchParams(window.location.search);
+      const token = params.get('t');
+      const roomIdDirect = params.get('room');
 
-    if (path === '/admin' || path === '/admin/') {
-      const pw = prompt("System-Passwort für Admin-Bereich:");
-      if (pw === "sybtec" || pw === "") setShowAdmin(true);
-      else window.location.href = "/";
-      setLoading(false);
-      return;
-    }
-    
-    // Zuerst Token prüfen
-    if (token) {
-      const decoded = gekkoService.decodeToken(token);
-      if (decoded) {
-        setCurrentRoomId(decoded.roomId);
-        gekkoService.setCurrentRoom(decoded.roomId);
-        localStorage.setItem('gekko_session_start', Date.now().toString());
-        localStorage.setItem('gekko_current_room', decoded.roomId);
-        
-        // URL bereinigen
-        const cleanUrl = window.location.origin + window.location.pathname + `?room=${decoded.roomId}`;
-        window.history.replaceState({}, '', cleanUrl);
+      gekkoService.logToServer('INFO', 'App Initialisierung...', { token: !!token, room: roomIdDirect });
+
+      if (path === '/admin' || path === '/admin/') {
+        const pw = prompt("System-Passwort für Admin-Bereich:");
+        if (pw === "sybtec" || pw === "") setShowAdmin(true);
+        else window.location.href = "/";
         setLoading(false);
         return;
       }
-    } 
-    
-    // Dann Fallback auf Room-Parameter oder Storage
-    if (roomIdDirect) {
-      setCurrentRoomId(roomIdDirect);
-      gekkoService.setCurrentRoom(roomIdDirect);
-    } else {
-      const storedRoom = localStorage.getItem('gekko_current_room');
-      if (storedRoom) {
-        setCurrentRoomId(storedRoom);
-        gekkoService.setCurrentRoom(storedRoom);
+      
+      if (token) {
+        const decoded = gekkoService.decodeToken(token);
+        if (decoded) {
+          setCurrentRoomId(decoded.roomId);
+          gekkoService.setCurrentRoom(decoded.roomId);
+          localStorage.setItem('gekko_session_start', Date.now().toString());
+          localStorage.setItem('gekko_current_room', decoded.roomId);
+          
+          const cleanUrl = window.location.origin + window.location.pathname + `?room=${decoded.roomId}`;
+          window.history.replaceState({}, '', cleanUrl);
+          setLoading(false);
+          return;
+        } else {
+          setExpiryReason("Token ungültig oder Schlüssel-Mismatch");
+          setIsExpired(true);
+        }
+      } 
+      
+      if (roomIdDirect) {
+        setCurrentRoomId(roomIdDirect);
+        gekkoService.setCurrentRoom(roomIdDirect);
+      } else {
+        const storedRoom = localStorage.getItem('gekko_current_room');
+        if (storedRoom) {
+          setCurrentRoomId(storedRoom);
+          gekkoService.setCurrentRoom(storedRoom);
+        }
       }
-    }
-    
-    setLoading(false);
+      
+      setLoading(false);
+    };
+
+    init();
   }, []);
 
   const checkExpiry = useCallback(() => {
-    // Wenn wir gerade laden oder im Admin sind, kein "Expired" anzeigen
     if (loading || isPreview || showAdmin) return;
 
     const startTimeStr = localStorage.getItem('gekko_session_start');
     const storedRoom = localStorage.getItem('gekko_current_room');
 
-    if (!startTimeStr || !currentRoomId || currentRoomId !== storedRoom) {
+    if (!startTimeStr || !currentRoomId) {
+      if (!isExpired) {
+        setIsExpired(true);
+        setExpiryReason("Keine aktive Sitzung (bitte QR scannen)");
+      }
+      return;
+    }
+
+    if (currentRoomId !== storedRoom) {
       setIsExpired(true);
+      setExpiryReason("Raum-Mismatch");
       return;
     }
 
     const startTime = parseInt(startTimeStr, 10);
     if (Date.now() - startTime > SESSION_DURATION_MS) {
       setIsExpired(true);
+      setExpiryReason("Sitzung abgelaufen (15 min)");
     } else {
       setIsExpired(false);
     }
-  }, [currentRoomId, isPreview, showAdmin, loading]);
+  }, [currentRoomId, isPreview, showAdmin, loading, isExpired]);
 
   useEffect(() => {
     if (!loading) {
@@ -111,17 +128,17 @@ const App: React.FC = () => {
       const data = await gekkoService.fetchStatus(currentRoomId);
       setStatus(data);
     } catch (e: any) {
-      console.error("Status-Update Fehler:", e);
+      gekkoService.logToServer('ERROR', 'Status-Update fehlgeschlagen', { error: e.message });
     }
   }, [isExpired, loading, currentRoomId, showAdmin]);
 
   useEffect(() => {
-    if (!loading && currentRoomId && !showAdmin) {
+    if (!loading && currentRoomId && !showAdmin && !isExpired) {
       refreshData();
       const interval = setInterval(refreshData, POLLING_INTERVAL_MS);
       return () => clearInterval(interval);
     }
-  }, [refreshData, currentRoomId, showAdmin, loading]);
+  }, [refreshData, currentRoomId, showAdmin, loading, isExpired]);
 
   const handleTempAdjust = async (delta: number) => {
     if (!status || isExpired || !currentRoomId) return;
@@ -171,7 +188,7 @@ const App: React.FC = () => {
   if (!currentRoomId || isExpired) {
     return (
       <div className="h-screen w-full max-w-md mx-auto relative overflow-hidden shadow-2xl bg-[#00828c]">
-        <ExpiredScreen onAdminClick={() => setShowAdmin(true)} />
+        <ExpiredScreen reason={expiryReason} onAdminClick={() => setShowAdmin(true)} />
         <div className="absolute top-0 left-0 w-full h-24" onMouseDown={handleAdminStart} onMouseUp={handleAdminEnd} onTouchStart={handleAdminStart} onTouchEnd={handleAdminEnd} />
       </div>
     );

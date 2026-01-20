@@ -30,6 +30,18 @@ class GekkoService {
     this.loadFromStorage();
   }
 
+  // Hilfsfunktion zum Senden von Logs an den Server-Terminal
+  async logToServer(level: 'INFO' | 'ERROR' | 'WARN', message: string, data?: any) {
+    console.log(`[${level}] ${message}`, data || '');
+    try {
+      await fetch('/api/log', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ level, message, data })
+      });
+    } catch (e) {}
+  }
+
   private loadFromStorage() {
     const stored = localStorage.getItem(STORAGE_KEY);
     if (stored) {
@@ -55,7 +67,6 @@ class GekkoService {
     this.saveToStorage();
   }
 
-  // URL-Safe Base64: + wird -, / wird _
   generateToken(roomId: string): string {
     const payload = JSON.stringify({
       r: roomId,
@@ -67,16 +78,25 @@ class GekkoService {
 
   decodeToken(token: string): { roomId: string } | null {
     try {
-      // Zurück zu Standard Base64
+      this.logToServer('INFO', 'Dekodiere Token...', { tokenLength: token.length });
+      
       let base64 = token.replace(/-/g, '+').replace(/_/g, '/');
       while (base64.length % 4 !== 0) base64 += '=';
       
-      const decoded = JSON.parse(atob(base64));
+      const decodedStr = atob(base64);
+      const decoded = JSON.parse(decodedStr);
+      
       if (decoded.s === this.config.secretKey) {
+        this.logToServer('INFO', 'Token erfolgreich validiert', { room: decoded.r });
         return { roomId: decoded.r };
+      } else {
+        this.logToServer('ERROR', 'Schlüssel-Mismatch!', { 
+          tokenKey: decoded.s, 
+          localKey: this.config.secretKey 
+        });
       }
-    } catch (e) {
-      console.error("Token Dekodierungsfehler - Token evtl. beschädigt oder Key ungleich.");
+    } catch (e: any) {
+      this.logToServer('ERROR', 'Kritischer Dekodierungsfehler', { error: e.message });
     }
     return null;
   }

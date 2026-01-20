@@ -10,8 +10,17 @@ const app = express();
 const PORT = process.env.PORT || 3000;
 
 app.use(cors());
+app.use(express.json()); // Erlaubt das Empfangen von JSON-Logs
 
-// Middleware für On-the-fly Transpilierung - fängt alle .ts und .tsx Anfragen ab
+// Debug-Endpunkt für Handy-Logs
+app.post('/api/log', (req, res) => {
+    const { level, message, data } = req.body;
+    const timestamp = new Date().toLocaleTimeString();
+    console.log(`[CLIENT-LOG ${timestamp}] [${level}] ${message}`, data || '');
+    res.sendStatus(200);
+});
+
+// Middleware für On-the-fly Transpilierung
 app.get(['/**/*.tsx', '/**/*.ts', '/*.tsx', '/*.ts'], async (req, res, next) => {
     const cleanPath = req.path;
     const filePath = path.join(__dirname, cleanPath);
@@ -37,7 +46,6 @@ app.get(['/**/*.tsx', '/**/*.ts', '/*.tsx', '/*.ts'], async (req, res, next) => 
 
 app.use(express.static(__dirname));
 
-// Integrierter Gekko-Proxy für CORS-Umgehung
 app.use('/api/proxy', (req, res, next) => {
     const targetUrl = req.query.url;
     if (!targetUrl) return res.status(400).send('Missing "url" parameter');
@@ -62,10 +70,10 @@ app.get('*', (req, res) => {
 app.listen(PORT, () => {
     console.log(`
 ==================================================
-  TEKKO SERVER LÄUFT (FINAL VERSION)
+  TEKKO SERVER LÄUFT
 ==================================================
   URL: http://localhost:${PORT}
-  Proxy: Aktiv (/api/proxy)
+  Debug-Logs: Aktiv (Handy-Fehler erscheinen hier)
 ==================================================
     `);
 });
