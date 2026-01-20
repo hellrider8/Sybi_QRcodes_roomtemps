@@ -81,7 +81,16 @@ class GekkoService {
       finalUrl += `${connector}${queryParts.join('&')}`;
     }
     
-    // Einfache Proxy-Logik wie zu Beginn
+    /**
+     * NEUE LOGIK: Wenn wir im "Integrated Mode" sind (server.js), 
+     * nutzen wir unseren eigenen /api/proxy Endpunkt.
+     */
+    if (this.config.apiMode === 'local') {
+      // Wenn wir lokal auf dem Server laufen, nutzen wir den internen Pfad
+      return `/api/proxy?url=${encodeURIComponent(finalUrl)}`;
+    }
+
+    // Fallback für manuelle Proxies oder Cloud
     const proxy = this.config.corsProxy?.trim();
     if (proxy && proxy.startsWith('http')) {
       const cleanProxy = proxy.endsWith('/') ? proxy : proxy + '/';
@@ -96,12 +105,8 @@ class GekkoService {
       'Accept': 'application/json'
     };
 
-    // WICHTIG: cors-anywhere benötigt diesen Header fast immer
-    if (this.config.corsProxy && this.config.corsProxy.startsWith('http')) {
-      headers['X-Requested-With'] = 'XMLHttpRequest';
-    }
-
-    // Bei Lokal-Modus schicken wir die Auth immer mit
+    // Im integrierten Modus brauchen wir keine speziellen Header für den Proxy,
+    // da der Node-Server die Authorization für uns an das myGEKKO weiterreicht.
     if (this.config.apiMode === 'local') {
       const authString = `${this.config.username}:${this.config.password}`;
       headers['Authorization'] = 'Basic ' + btoa(authString);
@@ -123,7 +128,7 @@ class GekkoService {
       if (response.ok) return { success: true, message: "Verbindung erfolgreich!" };
       return { success: false, message: `Fehler: HTTP ${response.status}` };
     } catch (e: any) {
-      return { success: false, message: "Nicht erreichbar (Proxy/Netzwerk prüfen)" };
+      return { success: false, message: "Nicht erreichbar (IP im Backend korrekt?)" };
     }
   }
 
