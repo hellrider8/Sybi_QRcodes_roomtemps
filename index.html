@@ -1,57 +1,61 @@
+
 <!DOCTYPE html>
 <html lang="de">
-<head>
+  <head>
     <meta charset="UTF-8" />
-    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no" />
     <title>TEKKO Raumregelung</title>
     <script src="https://cdn.tailwindcss.com"></script>
-    <script type="importmap">
-    {
-        "imports": {
-            "react": "https://esm.sh/react@18.2.0",
-            "react-dom": "https://esm.sh/react-dom@18.2.0/client",
-            "lucide-react": "https://esm.sh/lucide-react@0.460.0?external=react"
-        }
-    }
-    </script>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@200;300;400;500;700&display=swap" rel="stylesheet">
     <style>
-        body { background-color: #e0e4e7; margin: 0; font-family: sans-serif; height: 100dvh; display: flex; align-items: center; justify-content: center; }
+      body {
+        font-family: 'Inter', -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
+        background-color: #e0e4e7;
+        margin: 0;
+        padding: 0;
+        overflow: hidden;
+        -webkit-font-smoothing: antialiased;
+        -moz-osx-font-smoothing: grayscale;
+      }
+      ::-webkit-scrollbar {
+        width: 0px;
+      }
+      .admin-input {
+        background: #f3f4f6;
+        border: 1px solid #d1d5db;
+        border-radius: 4px;
+        padding: 8px 12px;
+        width: 100%;
+        color: #374151;
+        font-size: 14px;
+      }
+      .admin-label {
+        display: block;
+        font-size: 12px;
+        text-transform: uppercase;
+        letter-spacing: 0.05em;
+        color: #6b7280;
+        margin-bottom: 4px;
+        margin-top: 12px;
+      }
     </style>
+  <script type="importmap">
+{
+  "imports": {
+    "react": "https://esm.sh/react@19.0.0",
+    "react-dom": "https://esm.sh/react-dom@19.0.0",
+    "react-dom/client": "https://esm.sh/react-dom@19.0.0/client",
+    "lucide-react": "https://esm.sh/lucide-react@0.460.0?external=react",
+    "qrcode.react": "https://esm.sh/qrcode.react@3.1.0?external=react",
+    "jszip": "https://esm.sh/jszip@3.10.1",
+    "file-saver": "https://esm.sh/file-saver@2.0.5",
+    "react-dom/": "https://esm.sh/react-dom@^19.2.3/",
+    "react/": "https://esm.sh/react@^19.2.3/"
+  }
+}
+</script>
 </head>
-<body>
+  <body>
     <div id="root"></div>
-
-    <script type="module">
-        import React, { useState } from 'react';
-        import { createRoot } from 'react-dom';
-        import { Thermometer, Settings, Minus, Plus } from 'lucide-react';
-
-        function App() {
-            const [temp, setTemp] = useState(21.0);
-            const params = new URLSearchParams(window.location.search);
-            const raum = params.get('raum') || 'Wohnzimmer';
-
-            return React.createElement('div', { className: 'bg-white p-8 rounded-[40px] shadow-2xl text-center w-80' },
-                React.createElement('div', { className: 'text-xs font-bold text-gray-400 uppercase tracking-widest mb-4' }, raum),
-                React.createElement('div', { className: 'flex justify-center mb-6' }, 
-                    React.createElement(Thermometer, { size: 64, className: 'text-blue-500' })
-                ),
-                React.createElement('div', { className: 'text-6xl font-light mb-8' }, temp.toFixed(1) + '°'),
-                React.createElement('div', { className: 'flex gap-4' },
-                    React.createElement('button', { 
-                        onClick: () => setTemp(t => t - 0.5),
-                        className: 'flex-1 bg-gray-100 p-4 rounded-2xl active:bg-gray-200' 
-                    }, React.createElement(Minus)),
-                    React.createElement('button', { 
-                        onClick: () => setTemp(t => t + 0.5),
-                        className: 'flex-1 bg-blue-500 text-white p-4 rounded-2xl active:bg-blue-600' 
-                    }, React.createElement(Plus))
-                )
-            );
-        }
-
-        const root = createRoot(document.getElementById('root'));
-        root.render(React.createElement(App));
-    </script>
-</body>
+  </body>
 </html>
