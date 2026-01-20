@@ -1,5 +1,6 @@
 
-import { useState, useEffect } from 'react';
+// Added React import to fix namespace error
+import React, { useState, useEffect } from 'react';
 import { ChevronLeft } from 'lucide-react';
 
 interface HeaderProps {

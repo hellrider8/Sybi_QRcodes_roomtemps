@@ -13,7 +13,7 @@ export interface DiscoveryResult {
 class GekkoService {
   private config: GekkoConfig = {
     apiMode: 'local',
-    ip: '192.168.1.100',
+    ip: '',
     gekkoId: '',
     username: '',
     password: '',
@@ -24,8 +24,6 @@ class GekkoService {
 
   private currentRoomId: string = '';
   public lastRawStatus: string = ""; 
-  private last429Time: number = 0;
-  private readonly COOLDOWN_MS = 30000;
 
   constructor() {
     this.loadFromStorage();
@@ -38,7 +36,7 @@ class GekkoService {
         const parsed = JSON.parse(stored);
         this.config = { ...this.config, ...parsed };
       } catch (e) {
-        console.error("Failed to parse stored config", e);
+        console.error("Failed to parse config", e);
       }
     }
   }
@@ -58,11 +56,6 @@ class GekkoService {
 
   setCurrentRoom(id: string) {
     this.currentRoomId = id;
-  }
-
-  public isRateLimited(): boolean {
-    if (this.last429Time === 0) return false;
-    return Date.now() - this.last429Time < this.COOLDOWN_MS;
   }
 
   private getUrl(path: string, customQuery: string = '') {
@@ -88,58 +81,49 @@ class GekkoService {
       finalUrl += `${connector}${queryParts.join('&')}`;
     }
     
-    if (this.config.corsProxy && this.config.corsProxy.trim() !== '') {
-      const proxy = this.config.corsProxy.trim();
-      const separator = proxy.endsWith('/') ? '' : '/';
-      return `${proxy}${separator}${finalUrl}`;
+    // Einfache Proxy-Logik wie zu Beginn
+    const proxy = this.config.corsProxy?.trim();
+    if (proxy && proxy.startsWith('http')) {
+      const cleanProxy = proxy.endsWith('/') ? proxy : proxy + '/';
+      return `${cleanProxy}${finalUrl}`;
     }
 
     return finalUrl;
   }
 
   private getFetchOptions(): RequestInit {
-    const options: RequestInit = {
-      mode: 'cors',
-      cache: 'no-cache',
-      headers: {
-        'Accept': 'application/json'
-      }
+    const headers: Record<string, string> = {
+      'Accept': 'application/json'
     };
 
-    // Add X-Requested-With if using a proxy (required by cors-anywhere)
-    if (this.config.corsProxy && this.config.corsProxy.trim() !== '') {
-      (options.headers as any)['X-Requested-With'] = 'XMLHttpRequest';
+    // WICHTIG: cors-anywhere benötigt diesen Header fast immer
+    if (this.config.corsProxy && this.config.corsProxy.startsWith('http')) {
+      headers['X-Requested-With'] = 'XMLHttpRequest';
     }
 
-    if (typeof AbortSignal !== 'undefined' && 'timeout' in AbortSignal) {
-      // @ts-ignore
-      options.signal = AbortSignal.timeout(10000);
-    }
-
+    // Bei Lokal-Modus schicken wir die Auth immer mit
     if (this.config.apiMode === 'local') {
       const authString = `${this.config.username}:${this.config.password}`;
-      (options.headers as any)['Authorization'] = 'Basic ' + btoa(authString);
+      headers['Authorization'] = 'Basic ' + btoa(authString);
     }
 
-    return options;
+    return {
+      mode: 'cors',
+      cache: 'no-cache',
+      headers
+    };
   }
 
-  async testConnection(): Promise<{ success: boolean; message: string; debugUrl?: string }> {
-    if (this.config.useMock) return { success: true, message: "Simulation aktiv" };
-    if (this.isRateLimited()) return { success: false, message: "429: Zu viele Anfragen (Cooldown)" };
-
+  async testConnection(): Promise<{ success: boolean; message: string }> {
+    if (this.config.useMock) return { success: true, message: "Simulation OK" };
+    
     const url = this.getUrl('/roomtemps/');
     try {
       const response = await fetch(url, this.getFetchOptions());
-      if (response.ok) return { success: true, message: "Verbindung OK", debugUrl: url };
-      if (response.status === 403) return { success: false, message: "403 Forbidden: Proxy blockiert evtl.", debugUrl: url };
-      if (response.status === 429) {
-        this.last429Time = Date.now();
-        return { success: false, message: "429: Zu viele Anfragen", debugUrl: url };
-      }
-      return { success: false, message: `Status ${response.status}`, debugUrl: url };
+      if (response.ok) return { success: true, message: "Verbindung erfolgreich!" };
+      return { success: false, message: `Fehler: HTTP ${response.status}` };
     } catch (e: any) {
-      return { success: false, message: e.message || "Netzwerkfehler", debugUrl: url };
+      return { success: false, message: "Nicht erreichbar (Proxy/Netzwerk prüfen)" };
     }
   }
 
@@ -147,95 +131,55 @@ class GekkoService {
     if (this.config.useMock) {
       return {
         rooms: [
-          { id: 'item0', name: 'Küche (Mock)', enabled: true, category: 'EG' },
-          { id: 'item1', name: 'Bad (Mock)', enabled: true, category: 'OG' }
+          { id: 'item0', name: 'Wohnzimmer (Sim)', enabled: true, category: 'EG' },
+          { id: 'item1', name: 'Küche (Sim)', enabled: true, category: 'EG' }
         ],
-        rawData: { info: "Simulation Data" },
-        debugInfo: "Simulation aktiv"
+        rawData: null,
+        debugInfo: "Simulation"
       };
     }
 
-    if (this.isRateLimited()) return { rooms: [], rawData: null, debugInfo: "Rate Limit aktiv (429)", error: "429 (Cooldown)" };
-
     const url = this.getUrl('/roomtemps/');
-    let rawData: any = null;
-    let debugInfo = "";
-
     try {
       const response = await fetch(url, this.getFetchOptions());
-      if (response.status === 429) {
-        this.last429Time = Date.now();
-        return { rooms: [], rawData: null, debugInfo, error: "429" };
+      const rawData = await response.json();
+      const items = rawData.roomtemps || rawData;
+      const rooms: RoomDefinition[] = [];
+
+      for (const id in items) {
+        if (id.toLowerCase().startsWith('item')) {
+          rooms.push({
+            id: id,
+            name: items[id].name || id,
+            category: items[id].page || "RÄUME",
+            enabled: true
+          });
+        }
       }
-      if (!response.ok) return { rooms: [], rawData: null, debugInfo, error: `Fehler ${response.status}` };
-      rawData = await response.json();
+      return { rooms, rawData, debugInfo: "Import erfolgreich" };
     } catch (e: any) {
-      return { rooms: [], rawData: null, debugInfo, error: e.message };
-    }
-    
-    const items = rawData.roomtemps ? rawData.roomtemps : rawData;
-    const discoveredRooms: RoomDefinition[] = [];
-
-    for (const id in items) {
-      if (id.toLowerCase().startsWith('item')) {
-        const itemData = items[id];
-        discoveredRooms.push({
-          id: id,
-          name: itemData.name || `Raum ${id}`,
-          category: itemData.page || "RÄUME",
-          enabled: true
-        });
-      }
-    }
-    return { rooms: discoveredRooms, rawData, debugInfo };
-  }
-
-  private mapWorkingMode(mode: string): string {
-    const m = parseInt(mode);
-    switch(m) {
-      case 1: return 'AUS';
-      case 8: return 'KOMFORT';
-      case 16: return 'Absenk.'; 
-      case 64: return 'MANUELL';
-      case 256: return 'STANDBY';
-      default: return 'AUTOMATIK';
+      return { rooms: [], rawData: null, debugInfo: "Import fehlgeschlagen", error: e.message };
     }
   }
 
   async fetchStatus(roomId: string = this.currentRoomId): Promise<GekkoStatus> {
     const room = this.config.rooms.find(r => r.id === roomId);
-    
     if (this.config.useMock) {
       return {
-        sollTemp: 22.0, istTemp: 21.5, offset: 0.0, reglerPercent: 30,
-        ventilatorState: 1, hauptbetriebsart: 'AUTOMATIK', betriebsart: 'KOMFORT',
-        feuchte: 40, roomName: room?.name || "Mock Raum", category: room?.category || "EG"
+        sollTemp: 21.0, istTemp: 20.5 + Math.random(), offset: 0, reglerPercent: 20,
+        ventilatorState: 0, hauptbetriebsart: 'AUTOMATIK', betriebsart: 'KOMFORT',
+        feuchte: 50, roomName: room?.name || "Test", category: "SIM"
       };
     }
 
-    if (!roomId) throw new Error("Keine Raum-ID");
     const url = this.getUrl(`/roomtemps/${roomId}/status`);
     const response = await fetch(url, this.getFetchOptions());
-    
-    if (response.status === 429) {
-      this.last429Time = Date.now();
-      throw new Error("429");
-    }
-
     const data = await response.json();
     const itemData = data[roomId] || data;
-    const sumstateStr = itemData.sumstate?.value || itemData.sumstate || "";
-    this.lastRawStatus = sumstateStr;
+    const vals = (itemData.sumstate?.value || itemData.sumstate || "").split(';');
     
-    if (!sumstateStr) {
-      return {
-        istTemp: 0, sollTemp: 0, reglerPercent: 0, betriebsart: 'OFFLINE',
-        offset: 0, feuchte: 0, ventilatorState: 0, hauptbetriebsart: 'AUTOMATIK',
-        roomName: itemData.name || room?.name || roomId, category: itemData.page || room?.category || "RÄUME"
-      };
-    }
+    this.lastRawStatus = itemData.sumstate?.value || itemData.sumstate || "";
 
-    const vals = sumstateStr.split(';');
     return {
       istTemp: parseFloat(vals[0]) || 0,
       sollTemp: parseFloat(vals[1]) || 0,
@@ -246,8 +190,16 @@ class GekkoService {
       ventilatorState: 0, 
       hauptbetriebsart: 'AUTOMATIK', 
       roomName: itemData.name || room?.name || roomId,
-      category: itemData.page || room?.category || "RÄUME"
+      category: itemData.page || "RÄUME"
     };
+  }
+
+  private mapWorkingMode(mode: string): string {
+    const m = parseInt(mode);
+    if (m === 8) return 'KOMFORT';
+    if (m === 16) return 'Absenk.';
+    if (m === 64) return 'MANUELL';
+    return 'AUTOMATIK';
   }
 
   async setAdjustment(newOffset: number, roomId: string = this.currentRoomId): Promise<boolean> {
