@@ -6,3 +6,7 @@ npm-debug.log
 config.json
 Dockerfile
 .dockerignore
+dist
+*.md
+.gitignore
+.gitignored
