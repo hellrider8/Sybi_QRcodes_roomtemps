@@ -36,7 +36,7 @@ const Footer: React.FC<FooterProps> = ({ hauptMode, subMode, feuchte }) => {
             <span className="text-sm font-light tracking-wider mr-2">{feuchte.toFixed(1)} % rF</span>
           </div>
 
-          {/* Sybtec Branding mit echtem S-Logo */}
+          {/* Sybtec Branding mit korrigiertem S-Logo */}
           <div className="pt-8 flex justify-center items-center">
             <a 
               href="https://www.sybtec.de/" 
@@ -46,21 +46,21 @@ const Footer: React.FC<FooterProps> = ({ hauptMode, subMode, feuchte }) => {
             >
               <div className="relative w-8 h-8">
                 <svg viewBox="0 0 100 120" className="w-full h-full drop-shadow-sm">
-                  {/* Purple Part of the S */}
+                  {/* Purple Part of the S (Top Hook) */}
                   <path 
-                    d="M30 110 L30 90 C30 70 50 70 50 70 L70 70 C85 70 85 50 85 50 C85 30 70 30 65 30 L40 30 C20 30 20 10 20 10 L20 0" 
+                    d="M 22,45 C 22,10 78,10 78,45 C 78,55 65,60 50,60" 
                     fill="none" 
-                    stroke="#4B0082" 
+                    stroke="#9333ea" 
                     strokeWidth="18" 
-                    strokeLinecap="square"
+                    strokeLinecap="round"
                   />
-                  {/* Green Part of the S */}
+                  {/* Green Part of the S (Bottom Hook) */}
                   <path 
-                    d="M70 10 L70 30 C70 50 50 50 50 50 L30 50 C15 50 15 70 15 70 C15 90 30 90 35 90 L60 90 C80 90 80 110 80 110 L80 120" 
+                    d="M 78,75 C 78,110 22,110 22,75 C 22,65 35,60 50,60" 
                     fill="none" 
-                    stroke="#76C74D" 
+                    stroke="#84cc16" 
                     strokeWidth="18" 
-                    strokeLinecap="square"
+                    strokeLinecap="round"
                   />
                 </svg>
               </div>

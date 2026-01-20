@@ -30,17 +30,6 @@ class GekkoService {
 
   constructor() {}
 
-  async logToServer(level: 'INFO' | 'ERROR' | 'WARN', message: string, data?: any) {
-    console.log(`[${level}] ${message}`, data || '');
-    try {
-      await fetch('/api/log', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ level, message, data })
-      });
-    } catch (e) {}
-  }
-
   async loadConfig(): Promise<GekkoConfig> {
     try {
       const response = await fetch('/api/config');
@@ -94,7 +83,7 @@ class GekkoService {
       if (data.s && data.s !== this.config.secretKey) return null;
       return { roomId: data.r };
     } catch (e: any) {
-      this.logToServer('ERROR', 'Token Dekodierung fehlgeschlagen', { error: e.message });
+      console.error('Token Dekodierung fehlgeschlagen', e);
     }
     return null;
   }
@@ -173,10 +162,6 @@ class GekkoService {
     }
   }
 
-  /**
-   * Holt den Status aller Räume über den Bulk-Endpunkt (/roomtemps/status)
-   * Dies ist schneller und effizienter bei mehreren Usern oder Räumen.
-   */
   async fetchStatus(roomId: string = this.currentRoomId): Promise<GekkoStatus> {
     const room = this.config.rooms.find(r => r.id === roomId);
     if (this.config.useMock) {
@@ -187,14 +172,14 @@ class GekkoService {
       };
     }
 
-    // Wir nutzen den Bulk-Status Endpunkt für alle Räume gleichzeitig
+    // Bulk-Endpunkt nutzen
     const url = this.getUrl('/roomtemps/status');
     const response = await fetch(url, this.getFetchOptions());
+    if (!response.ok) throw new Error(`HTTP Error ${response.status}`);
     const allStatusData = await response.json();
     
-    // Wir extrahieren die Daten für den spezifischen Raum aus dem Bulk-Objekt
     const itemData = allStatusData[roomId];
-    if (!itemData) throw new Error(`Raum ${roomId} nicht im Status-Payload gefunden.`);
+    if (!itemData) throw new Error(`Raum ${roomId} nicht im Payload`);
 
     const vals = (itemData.sumstate?.value || itemData.sumstate || "").split(';');
     this.lastRawStatus = itemData.sumstate?.value || itemData.sumstate || "";

@@ -18,9 +18,9 @@ export interface GekkoConfig {
   secretKey: string; 
   corsProxy?: string; 
   sessionDurationMinutes: number; 
-  minOffset: number; // Neu: Untere Grenze für +/- Anpassung
-  maxOffset: number; // Neu: Obere Grenze für +/- Anpassung
-  stepSize: number;  // Neu: Schrittweite der Anpassung
+  minOffset: number; 
+  maxOffset: number; 
+  stepSize: number;  
 }
 
 export interface GekkoStatus {

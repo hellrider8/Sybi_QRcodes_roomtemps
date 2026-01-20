@@ -7,10 +7,10 @@ import Footer from './components/Footer.tsx';
 import ExpiredScreen from './components/ExpiredScreen.tsx';
 import AdminPanel from './components/AdminPanel.tsx';
 import { gekkoService } from './services/gekkoService.ts';
-import { GekkoStatus, GekkoConfig } from './types.ts';
+import { GekkoStatus } from './types.ts';
 
 const POLLING_INTERVAL_MS = 10000;
-const SYNC_LOCK_DURATION_MS = 3500; // Dauer, wie lange Server-Updates ignoriert werden nach Klick
+const SYNC_LOCK_TIMEOUT_MS = 5000; 
 
 const App: React.FC = () => {
   const [status, setStatus] = useState<GekkoStatus | null>(null);
@@ -21,11 +21,11 @@ const App: React.FC = () => {
   const [currentRoomId, setCurrentRoomId] = useState<string | null>(null);
   const [isPreview, setIsPreview] = useState(false);
   
-  // Optimistic UI state
-  const isAdjusting = useRef<boolean>(false);
-  const adjustTimer = useRef<number | null>(null);
+  const [optimisticOffset, setOptimisticOffset] = useState<number | null>(null);
+  const lastClickTime = useRef<number>(0);
   const pressTimer = useRef<number | null>(null);
 
+  // Initialisiere mit sicheren Standardwerten
   const [globalSettings, setGlobalSettings] = useState({
     sessionDurationMinutes: 15,
     minOffset: -3.0,
@@ -46,30 +46,30 @@ const App: React.FC = () => {
   const loadGlobalConfig = async () => {
     const config = await gekkoService.loadConfig();
     setGlobalSettings({
-      sessionDurationMinutes: config.sessionDurationMinutes || 15,
-      minOffset: config.minOffset !== undefined ? config.minOffset : -3.0,
-      maxOffset: config.maxOffset !== undefined ? config.maxOffset : 3.0,
-      stepSize: config.stepSize || 0.5
+      sessionDurationMinutes: Number(config.sessionDurationMinutes) || 15,
+      minOffset: config.minOffset !== undefined ? Number(config.minOffset) : -3.0,
+      maxOffset: config.maxOffset !== undefined ? Number(config.maxOffset) : 3.0,
+      stepSize: config.stepSize !== undefined ? Number(config.stepSize) : 0.5
     });
   };
 
   useEffect(() => {
     const init = async () => {
-      const path = window.location.pathname;
       const params = new URLSearchParams(window.location.search);
       const token = params.get('t');
       const roomIdDirect = params.get('room');
 
       await loadGlobalConfig();
 
-      if (path === '/admin' || path === '/admin/') {
-        const pw = prompt("System-Passwort für Admin-Bereich:");
+      if (window.location.pathname.includes('/admin')) {
+        const pw = prompt("Admin Passwort:");
         if (pw === "sybtec" || pw === "admin") setShowAdmin(true);
         else window.location.href = "/";
         setLoading(false);
         return;
       }
       
+      // Sitzungs-Logik: Ein Token in der URL startet eine neue Sitzung
       if (token) {
         const decoded = gekkoService.decodeToken(token);
         if (decoded) {
@@ -77,19 +77,17 @@ const App: React.FC = () => {
           gekkoService.setCurrentRoom(decoded.roomId);
           localStorage.setItem('gekko_session_start', Date.now().toString());
           localStorage.setItem('gekko_current_room', decoded.roomId);
-          const cleanUrl = window.location.origin + window.location.pathname + `?room=${decoded.roomId}`;
-          window.history.replaceState({}, '', cleanUrl);
-          setLoading(false);
-          return;
+          window.history.replaceState({}, '', window.location.origin + window.location.pathname + `?room=${decoded.roomId}`);
+          setIsExpired(false);
         } else {
-          setExpiryReason("Sicherheitsschlüssel-Konflikt");
           setIsExpired(true);
+          setExpiryReason("Ungültiger QR-Code");
         }
-      } 
-      
-      if (roomIdDirect) {
+      } else if (roomIdDirect) {
+        // Direktzugriff über Lesezeichen prüfen
         setCurrentRoomId(roomIdDirect);
         gekkoService.setCurrentRoom(roomIdDirect);
+        // checkExpiry wird im Intervall die fehlende session_start Zeit bemerken
       } else {
         const storedRoom = localStorage.getItem('gekko_current_room');
         if (storedRoom) {
@@ -104,18 +102,27 @@ const App: React.FC = () => {
 
   const checkExpiry = useCallback(() => {
     if (loading || isPreview || showAdmin) return;
+    
     const startTimeStr = localStorage.getItem('gekko_session_start');
-    if (!startTimeStr || !currentRoomId) {
-      if (!isExpired) { setIsExpired(true); setExpiryReason("Keine aktive Sitzung"); }
+    
+    // Wenn wir in einem Raum sind, aber keine Startzeit haben -> QR Scan erforderlich
+    if (!startTimeStr && currentRoomId) {
+      if (!isExpired) {
+        setIsExpired(true);
+        setExpiryReason("Bitte QR-Code scannen (Sitzungsschutz)");
+      }
       return;
     }
-    const startTime = parseInt(startTimeStr, 10);
-    const durationMs = globalSettings.sessionDurationMinutes * 60 * 1000;
-    if (Date.now() - startTime > durationMs) {
-      setIsExpired(true);
-      setExpiryReason(`Sitzung abgelaufen`);
-    } else {
-      setIsExpired(false);
+
+    if (startTimeStr) {
+      const startTime = parseInt(startTimeStr, 10);
+      const durationMs = Number(globalSettings.sessionDurationMinutes) * 60 * 1000;
+      if (Date.now() - startTime > durationMs) {
+        setIsExpired(true);
+        setExpiryReason(`Sitzung abgelaufen (${globalSettings.sessionDurationMinutes} Min.)`);
+      } else {
+        setIsExpired(false);
+      }
     }
   }, [currentRoomId, isPreview, showAdmin, loading, isExpired, globalSettings.sessionDurationMinutes]);
 
@@ -130,24 +137,27 @@ const App: React.FC = () => {
   const refreshData = useCallback(async () => {
     if (loading || isExpired || !currentRoomId || showAdmin) return;
     try {
-      const freshData = await gekkoService.fetchStatus(currentRoomId);
-      
-      // Wenn der User gerade aktiv anpasst, überschreiben wir die Soll-Werte nicht 
-      // mit möglicherweise veralteten Server-Daten (Sync-Lock)
-      if (isAdjusting.current) {
-        setStatus(prev => {
-          if (!prev) return freshData;
-          return {
-            ...freshData, // Nimm alles Neue (Ist-Temp, Feuchte, Ventil...)
-            offset: prev.offset, // Behalte aber den lokalen (optimistischen) Offset
-            sollTemp: prev.sollTemp // Behalte die lokale Soll-Temp
-          };
-        });
+      const fresh = await gekkoService.fetchStatus(currentRoomId);
+      const now = Date.now();
+      const isLocked = (now - lastClickTime.current) < SYNC_LOCK_TIMEOUT_MS;
+
+      if (isLocked && optimisticOffset !== null) {
+        if (Math.abs(Number(fresh.offset) - optimisticOffset) < 0.01) {
+          setOptimisticOffset(null);
+          setStatus(fresh);
+        } else {
+          setStatus({
+            ...fresh,
+            offset: optimisticOffset,
+            sollTemp: Number(fresh.sollTemp) + (optimisticOffset - Number(fresh.offset))
+          });
+        }
       } else {
-        setStatus(freshData);
+        setOptimisticOffset(null);
+        setStatus(fresh);
       }
-    } catch (e: any) {}
-  }, [isExpired, loading, currentRoomId, showAdmin]);
+    } catch (e) {}
+  }, [isExpired, loading, currentRoomId, showAdmin, optimisticOffset]);
 
   useEffect(() => {
     if (!loading && currentRoomId && !showAdmin && !isExpired) {
@@ -160,40 +170,42 @@ const App: React.FC = () => {
   const handleTempAdjust = async (delta: number) => {
     if (!status || isExpired || !currentRoomId) return;
     
-    // 1. Lock setzen: Wir verhindern, dass Hintergrund-Updates unsere Werte überschreiben
-    isAdjusting.current = true;
-    if (adjustTimer.current) clearTimeout(adjustTimer.current);
+    // Basiswert bestimmen und strikt als Number behandeln
+    const baseOffset = optimisticOffset !== null ? optimisticOffset : Number(status.offset);
+    let nextOffset = Number((baseOffset + delta).toFixed(2));
     
-    // Timer für das Aufheben des Locks (wird bei jedem Klick erneuert)
-    adjustTimer.current = window.setTimeout(() => {
-      isAdjusting.current = false;
-    }, SYNC_LOCK_DURATION_MS);
+    const min = Number(globalSettings.minOffset);
+    const max = Number(globalSettings.maxOffset);
 
-    // 2. Berechne neuen Offset (Optimistisch)
-    let newOffset = parseFloat((status.offset + delta).toFixed(2));
-    if (newOffset > globalSettings.maxOffset) newOffset = globalSettings.maxOffset;
-    if (newOffset < globalSettings.minOffset) newOffset = globalSettings.minOffset;
+    // Strikte Grenzwertprüfung
+    if (nextOffset > max) nextOffset = max;
+    if (nextOffset < min) nextOffset = min;
 
-    if (newOffset === status.offset) return;
+    // Wenn keine Änderung möglich (Limit erreicht)
+    if (Math.abs(nextOffset - baseOffset) < 0.01) {
+      console.log("Limit erreicht:", nextOffset);
+      return; 
+    }
 
-    const actualDelta = newOffset - status.offset;
-    const newSoll = parseFloat((status.sollTemp + actualDelta).toFixed(2));
-
-    // 3. Sofortiges lokales State-Update (Optimistic UI)
-    setStatus(prev => prev ? { ...prev, sollTemp: newSoll, offset: newOffset } : null);
+    lastClickTime.current = Date.now();
+    setOptimisticOffset(nextOffset);
     
-    // 4. Befehl an myGEKKO senden
-    const success = await gekkoService.setAdjustment(newOffset, currentRoomId);
-    if (!success) {
-      // Bei Fehler: Lock aufheben und Daten neu laden
-      isAdjusting.current = false;
+    setStatus(prev => prev ? {
+      ...prev,
+      offset: nextOffset,
+      sollTemp: Number(prev.sollTemp) + (nextOffset - baseOffset)
+    } : null);
+    
+    const ok = await gekkoService.setAdjustment(nextOffset, currentRoomId);
+    if (!ok) {
+      setOptimisticOffset(null);
       refreshData();
     }
   };
 
   const handleAdminStart = () => {
     pressTimer.current = window.setTimeout(() => {
-      const pw = prompt("System-Passwort:");
+      const pw = prompt("Admin Passwort:");
       if (pw === "sybtec" || pw === "admin") setShowAdmin(true);
     }, 3000);
   };
@@ -202,51 +214,21 @@ const App: React.FC = () => {
     if (pressTimer.current) { clearTimeout(pressTimer.current); pressTimer.current = null; }
   };
 
-  if (loading) {
-    return (
-      <div className="min-h-screen w-full flex flex-col items-center justify-center bg-[#e0e4e7]">
-        <div className="w-10 h-10 border-4 border-[#00828c]/20 border-t-[#00828c] rounded-full animate-spin"></div>
-      </div>
-    );
-  }
+  if (loading) return <div className="min-h-screen flex items-center justify-center bg-[#e0e4e7]"><div className="w-10 h-10 border-4 border-[#00828c] border-t-transparent rounded-full animate-spin"></div></div>;
 
-  if (showAdmin) {
-    return (
-      <AdminPanel 
-        onClose={async () => { await loadGlobalConfig(); setShowAdmin(false); }} 
-        onPreviewRoom={(id) => { 
-          setIsPreview(true); setCurrentRoomId(id); gekkoService.setCurrentRoom(id); setShowAdmin(false); 
-        }} 
-      />
-    );
-  }
+  if (showAdmin) return <AdminPanel onClose={async () => { await loadGlobalConfig(); setShowAdmin(false); }} onPreviewRoom={(id) => { setIsPreview(true); setCurrentRoomId(id); gekkoService.setCurrentRoom(id); setShowAdmin(false); }} />;
 
-  if (!currentRoomId || isExpired) {
-    return (
-      <div className="min-h-screen w-full max-w-md mx-auto relative shadow-2xl bg-[#00828c] overflow-x-hidden">
-        <ExpiredScreen reason={expiryReason} sessionMinutes={globalSettings.sessionDurationMinutes} />
-        <div className="absolute top-0 left-0 w-full h-32 z-50" onMouseDown={handleAdminStart} onMouseUp={handleAdminEnd} onTouchStart={handleAdminStart} onTouchEnd={handleAdminEnd} />
-      </div>
-    );
-  }
-
-  if (!status) {
-    return (
-      <div className="min-h-screen w-full flex flex-col items-center justify-center bg-[#e0e4e7]">
-        <span className="text-[10px] font-bold text-[#00828c] uppercase tracking-widest">Initialisierung...</span>
-      </div>
-    );
-  }
+  if (!currentRoomId || isExpired) return <div className="min-h-screen max-w-md mx-auto bg-[#00828c] relative"><ExpiredScreen reason={expiryReason} sessionMinutes={globalSettings.sessionDurationMinutes} /><div className="absolute top-0 w-full h-32 z-[60]" onMouseDown={handleAdminStart} onMouseUp={handleAdminEnd} onTouchStart={handleAdminStart} onTouchEnd={handleAdminEnd} /></div>;
 
   return (
     <div className="min-h-screen flex flex-col bg-[#e0e4e7] max-w-md mx-auto shadow-2xl relative select-none overflow-x-hidden">
       <div onMouseDown={handleAdminStart} onMouseUp={handleAdminEnd} onTouchStart={handleAdminStart} onTouchEnd={handleAdminEnd}>
-        <Header roomName={status.roomName} category={status.category} onBack={isPreview ? () => window.location.reload() : logout} showBack={isPreview || !!currentRoomId} isLogout={!isPreview} />
+        <Header roomName={status?.roomName || ""} category={status?.category || ""} onBack={isPreview ? () => window.location.reload() : logout} showBack={true} isLogout={!isPreview} />
       </div>
-      <main className="flex-1 flex flex-col relative pb-4 overflow-y-auto overflow-x-hidden">
-        <MainControl soll={status.sollTemp} ist={status.istTemp} offset={status.offset} mode={status.betriebsart} onAdjust={handleTempAdjust} stepSize={globalSettings.stepSize} />
-        <StatusLine regler={status.reglerPercent} ventilator={status.ventilatorState} />
-        <Footer hauptMode={status.hauptbetriebsart} subMode={status.betriebsart} feuchte={status.feuchte} />
+      <main className="flex-1 flex flex-col relative pb-4">
+        {status && <MainControl soll={status.sollTemp} ist={status.istTemp} offset={status.offset} mode={status.betriebsart} onAdjust={handleTempAdjust} stepSize={Number(globalSettings.stepSize)} />}
+        {status && <StatusLine regler={status.reglerPercent} ventilator={status.ventilatorState} />}
+        {status && <Footer hauptMode={status.hauptbetriebsart} subMode={status.betriebsart} feuchte={status.feuchte} />}
       </main>
     </div>
   );

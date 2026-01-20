@@ -2,7 +2,7 @@
 import React, { useState, useEffect } from 'react';
 import { Save, Plus, Trash2, X, Settings, Shield, RefreshCw, Globe, Wifi, Eye, AlertCircle, CheckCircle2, Terminal, Copy, Server, Activity, Search, Hash, QrCode as QrIcon, Lock, Clock, Download, FileArchive, SlidersHorizontal } from 'lucide-react';
 import { gekkoService } from '../services/gekkoService.ts';
-import { RoomDefinition } from '../types.ts';
+import { RoomDefinition, GekkoConfig } from '../types.ts';
 import { QRCodeCanvas } from 'qrcode.react';
 import JSZip from 'jszip';
 
@@ -12,7 +12,7 @@ interface AdminPanelProps {
 }
 
 const AdminPanel: React.FC<AdminPanelProps> = ({ onClose, onPreviewRoom }) => {
-  const [config, setConfig] = useState(gekkoService.getConfig());
+  const [config, setConfig] = useState<GekkoConfig>(gekkoService.getConfig());
   const [activeTab, setActiveTab] = useState<'api' | 'rooms' | 'export' | 'hosting'>('api');
   const [isTesting, setIsTesting] = useState(false);
   const [isDiscovering, setIsDiscovering] = useState(false);
@@ -20,7 +20,15 @@ const AdminPanel: React.FC<AdminPanelProps> = ({ onClose, onPreviewRoom }) => {
   const [isExporting, setIsExporting] = useState(false);
 
   const handleSave = async () => {
-    await gekkoService.setConfig(config);
+    // Validierung und Casting vor dem Speichern
+    const validatedConfig = {
+      ...config,
+      minOffset: Number(config.minOffset),
+      maxOffset: Number(config.maxOffset),
+      stepSize: Number(config.stepSize),
+      sessionDurationMinutes: Number(config.sessionDurationMinutes)
+    };
+    await gekkoService.setConfig(validatedConfig);
     alert("Einstellungen wurden gespeichert.");
   };
 
@@ -34,13 +42,13 @@ const AdminPanel: React.FC<AdminPanelProps> = ({ onClose, onPreviewRoom }) => {
       document.body.removeChild(textArea);
       alert("Link erfolgreich kopiert!");
     } catch (err) {
-      alert("Kopieren fehlgeschlagen. Bitte Link manuell kopieren.");
+      alert("Kopieren fehlgeschlagen.");
     }
   };
 
   const testConnection = async () => {
     setIsTesting(true);
-    gekkoService.setConfig(config);
+    await gekkoService.setConfig(config);
     const res = await gekkoService.testConnection();
     setTestResult({ success: res.success, msg: res.message });
     setIsTesting(false);
@@ -48,7 +56,7 @@ const AdminPanel: React.FC<AdminPanelProps> = ({ onClose, onPreviewRoom }) => {
 
   const handleDiscover = async () => {
     setIsDiscovering(true);
-    gekkoService.setConfig(config);
+    await gekkoService.setConfig(config);
     try {
       const result = await gekkoService.discoverRooms();
       if (result.rooms && result.rooms.length > 0) {
@@ -86,19 +94,16 @@ const AdminPanel: React.FC<AdminPanelProps> = ({ onClose, onPreviewRoom }) => {
     try {
       const zip = new JSZip();
       const canvases = document.querySelectorAll('.qr-export-container canvas');
-      
       if (canvases.length === 0) {
-        alert("Bitte erst den Export-Tab öffnen, damit die Codes generiert werden.");
+        alert("Bitte erst den Export-Tab öffnen.");
         setIsExporting(false);
         return;
       }
-
       canvases.forEach((canvas: any, index) => {
         const roomName = canvas.getAttribute('data-room-name') || `Raum_${index + 1}`;
         const imageData = canvas.toDataURL("image/png").split(',')[1];
         zip.file(`${roomName}.png`, imageData, {base64: true});
       });
-
       const content = await zip.generateAsync({type: "blob"});
       const url = window.URL.createObjectURL(content);
       const link = document.createElement('a');
@@ -107,7 +112,6 @@ const AdminPanel: React.FC<AdminPanelProps> = ({ onClose, onPreviewRoom }) => {
       link.click();
       window.URL.revokeObjectURL(url);
     } catch (error) {
-      console.error("Export Error:", error);
       alert("Fehler beim Exportieren.");
     } finally {
       setIsExporting(false);
@@ -160,10 +164,10 @@ const AdminPanel: React.FC<AdminPanelProps> = ({ onClose, onPreviewRoom }) => {
                 <button onClick={() => setConfig({...config, apiMode: 'cloud'})} className={`flex-1 py-2 rounded text-[10px] font-bold ${config.apiMode === 'cloud' ? 'bg-white text-[#00828c]' : 'text-slate-500'}`}>CLOUD (LiveID)</button>
               </div>
 
-              <input type="text" placeholder={config.apiMode === 'local' ? "myGEKKO IP (z.B. 10.10.10.50)" : "Live-ID (z.B. GK-12345)"} className="admin-input" value={config.apiMode === 'local' ? config.ip : config.gekkoId} onChange={e => setConfig(config.apiMode === 'local' ? {...config, ip: e.target.value} : {...config, gekkoId: e.target.value})} />
+              <input type="text" placeholder={config.apiMode === 'local' ? "IP (z.B. 10.10.10.50)" : "Live-ID"} className="admin-input" value={config.apiMode === 'local' ? config.ip : config.gekkoId} onChange={e => setConfig(config.apiMode === 'local' ? {...config, ip: e.target.value} : {...config, gekkoId: e.target.value})} />
               <div className="grid grid-cols-2 gap-3">
                 <input type="text" placeholder="Benutzer" className="admin-input" value={config.username} onChange={e => setConfig({...config, username: e.target.value})} />
-                <input type="password" placeholder="Passwort / Key" className="admin-input" value={config.password} onChange={e => setConfig({...config, password: e.target.value})} />
+                <input type="password" placeholder="Passwort" className="admin-input" value={config.password} onChange={e => setConfig({...config, password: e.target.value})} />
               </div>
 
               <button onClick={testConnection} disabled={isTesting} className="w-full py-3 bg-slate-900 text-white rounded-lg text-xs font-bold flex items-center justify-center gap-2">
@@ -182,27 +186,18 @@ const AdminPanel: React.FC<AdminPanelProps> = ({ onClose, onPreviewRoom }) => {
         {activeTab === 'rooms' && (
           <div className="max-w-2xl mx-auto space-y-4 pb-20">
              <div className="flex justify-between items-center mb-6">
-               <h3 className="text-sm font-bold uppercase text-slate-800">Gefundene Räume</h3>
-               <div className="flex gap-2">
-                 <button onClick={handleDiscover} disabled={isDiscovering} className="bg-slate-800 text-white px-4 py-2 rounded-lg text-[10px] font-bold flex items-center gap-2">
-                   {isDiscovering ? <RefreshCw size={12} className="animate-spin"/> : <Search size={12}/>} Räume suchen
-                 </button>
-               </div>
+               <h3 className="text-sm font-bold uppercase text-slate-800">Räume</h3>
+               <button onClick={handleDiscover} disabled={isDiscovering} className="bg-slate-800 text-white px-4 py-2 rounded-lg text-[10px] font-bold flex items-center gap-2">
+                 {isDiscovering ? <RefreshCw size={12} className="animate-spin"/> : <Search size={12}/>} Suchen
+               </button>
              </div>
-
              {config.rooms.map((r, i) => (
-               <div key={i} className="bg-white p-5 rounded-xl border shadow-sm group">
-                 <div className="flex items-center justify-between border-b pb-3 mb-4">
-                    <span className="text-[10px] font-bold text-[#00828c] uppercase">Raum ID: {r.id}</span>
-                    <div className="flex gap-2">
-                      <button onClick={() => onPreviewRoom(r.id)} className="p-1.5 text-[#00828c] hover:bg-teal-50 rounded" title="Vorschau"><Eye size={18}/></button>
-                      <button onClick={() => setConfig({...config, rooms: config.rooms.filter((_, idx) => idx !== i)})} className="p-1.5 text-red-400 hover:bg-red-50 rounded"><Trash2 size={18}/></button>
-                    </div>
+               <div key={i} className="bg-white p-5 rounded-xl border shadow-sm">
+                 <div className="flex items-center justify-between mb-4 border-b pb-2">
+                    <span className="text-[10px] font-bold text-[#00828c]">ID: {r.id}</span>
+                    <button onClick={() => setConfig({...config, rooms: config.rooms.filter((_, idx) => idx !== i)})} className="text-red-400"><Trash2 size={18}/></button>
                  </div>
-                 <div className="grid grid-cols-1 gap-2">
-                    <label className="text-[9px] font-bold uppercase text-slate-400">Anzeigename im Web-Interface</label>
-                    <input type="text" className="admin-input" value={r.name} onChange={e => updateRoom(i, {name: e.target.value})} />
-                 </div>
+                 <input type="text" className="admin-input" value={r.name} onChange={e => updateRoom(i, {name: e.target.value})} />
                </div>
              ))}
           </div>
@@ -211,39 +206,15 @@ const AdminPanel: React.FC<AdminPanelProps> = ({ onClose, onPreviewRoom }) => {
         {activeTab === 'export' && (
           <div className="max-w-4xl mx-auto space-y-8">
             <div className="flex justify-between items-center mb-6">
-              <h3 className="text-sm font-bold uppercase text-slate-800">QR-Code Katalog</h3>
-              <button 
-                onClick={exportAllQrCodes} 
-                disabled={isExporting}
-                className="bg-[#00828c] text-white px-6 py-2.5 rounded-lg text-[10px] font-bold uppercase flex items-center gap-2 shadow-md hover:bg-[#006a72] transition-all disabled:opacity-50"
-              >
-                {isExporting ? <RefreshCw size={14} className="animate-spin" /> : <FileArchive size={14} />} 
-                Alle als ZIP exportieren
-              </button>
+              <h3 className="text-sm font-bold uppercase">QR-Codes</h3>
+              <button onClick={exportAllQrCodes} className="bg-[#00828c] text-white px-6 py-2 rounded-lg text-[10px] font-bold uppercase">ZIP Export</button>
             </div>
-
             <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-6">
                {config.rooms.map(r => (
-                 <div key={r.id} className="bg-white p-6 border rounded-2xl flex flex-col items-center shadow-sm">
-                   <div className="w-full text-center mb-4 border-b pb-2">
-                     <span className="text-xs font-bold uppercase text-[#00828c]">{r.name}</span>
-                   </div>
-                   <div className="p-4 bg-white rounded-xl border border-slate-100 mb-4 qr-export-container">
-                     <QRCodeCanvas 
-                        value={getQrUrl(r.id)} 
-                        size={180} 
-                        level="H" 
-                        // Wir übergeben das Attribut direkt an das Canvas für den Export-Loop
-                        includeMargin={true}
-                        {...({"data-room-name": r.name} as any)}
-                      />
-                   </div>
-                   <button 
-                    onClick={() => copyToClipboard(getQrUrl(r.id))}
-                    className="w-full py-2.5 bg-slate-900 text-white rounded-lg text-[10px] font-bold uppercase flex items-center justify-center gap-2"
-                   >
-                     <Copy size={12}/> Link kopieren
-                   </button>
+                 <div key={r.id} className="bg-white p-6 border rounded-2xl flex flex-col items-center qr-export-container">
+                   <span className="text-xs font-bold mb-4">{r.name}</span>
+                   <QRCodeCanvas value={getQrUrl(r.id)} size={180} level="H" includeMargin={true} {...({"data-room-name": r.name} as any)} />
+                   <button onClick={() => copyToClipboard(getQrUrl(r.id))} className="mt-4 text-[10px] text-[#00828c] uppercase font-bold flex items-center gap-1"><Copy size={12}/> Link</button>
                  </div>
                ))}
             </div>
@@ -254,93 +225,42 @@ const AdminPanel: React.FC<AdminPanelProps> = ({ onClose, onPreviewRoom }) => {
           <div className="max-w-md mx-auto space-y-6">
             <div className="bg-white p-6 rounded-2xl border shadow-sm">
                <h3 className="font-bold text-sm mb-4 uppercase flex items-center gap-2 text-[#00828c]"><SlidersHorizontal size={16}/> Regelungsparameter</h3>
-               <p className="text-[10px] text-slate-400 mb-4 leading-relaxed">
-                 Einstellungen für die Temperatur-Anpassung (+/- Tasten). Gilt für alle Räume.
-               </p>
                <div className="space-y-4">
                  <div>
-                   <label className="text-[9px] font-bold uppercase text-slate-400 block mb-1">Anpassungsbereich (Min / Max in °C)</label>
+                   <label className="text-[9px] font-bold uppercase text-slate-400 block mb-1">Anpassungsbereich (Min / Max)</label>
                    <div className="grid grid-cols-2 gap-3">
                      <div className="relative">
-                       <span className="absolute left-3 top-2.5 text-slate-400 text-xs font-bold">MIN</span>
-                       <input 
-                        type="number" 
-                        step="0.1"
-                        className="admin-input pl-12 text-center font-bold" 
-                        value={config.minOffset} 
-                        onChange={e => setConfig({...config, minOffset: parseFloat(e.target.value) || -3})} 
-                       />
+                       <span className="absolute left-3 top-2.5 text-slate-400 text-xs">MIN</span>
+                       <input type="number" step="0.1" className="admin-input pl-12 text-center" value={config.minOffset} onChange={e => setConfig({...config, minOffset: Number(e.target.value)})} />
                      </div>
                      <div className="relative">
-                       <span className="absolute left-3 top-2.5 text-slate-400 text-xs font-bold">MAX</span>
-                       <input 
-                        type="number" 
-                        step="0.1"
-                        className="admin-input pl-12 text-center font-bold" 
-                        value={config.maxOffset} 
-                        onChange={e => setConfig({...config, maxOffset: parseFloat(e.target.value) || 3})} 
-                       />
+                       <span className="absolute left-3 top-2.5 text-slate-400 text-xs">MAX</span>
+                       <input type="number" step="0.1" className="admin-input pl-12 text-center" value={config.maxOffset} onChange={e => setConfig({...config, maxOffset: Number(e.target.value)})} />
                      </div>
                    </div>
                  </div>
-
                  <div>
-                   <label className="text-[9px] font-bold uppercase text-slate-400 block mb-1">Schrittweite (°C)</label>
-                   <input 
-                    type="number" 
-                    step="0.1"
-                    className="admin-input text-center font-bold" 
-                    value={config.stepSize} 
-                    onChange={e => setConfig({...config, stepSize: parseFloat(e.target.value) || 0.5})} 
-                   />
+                   <label className="text-[9px] font-bold uppercase text-slate-400 block mb-1">Schrittweite</label>
+                   <input type="number" step="0.1" className="admin-input text-center" value={config.stepSize} onChange={e => setConfig({...config, stepSize: Number(e.target.value)})} />
                  </div>
                </div>
             </div>
 
             <div className="bg-white p-6 rounded-2xl border shadow-sm">
-               <h3 className="font-bold text-sm mb-4 uppercase flex items-center gap-2"><Lock size={16}/> Sicherheitsschlüssel</h3>
-               <p className="text-[10px] text-slate-400 mb-4 leading-relaxed">
-                 Dieser Schlüssel muss auf dem Server und beim Token-Check identisch sein. 
-               </p>
-               <div className="flex gap-2">
-                 <input 
-                  type="text" 
-                  className="admin-input font-mono text-xs" 
-                  value={config.secretKey} 
-                  onChange={e => setConfig({...config, secretKey: e.target.value})} 
-                 />
-                 <button 
-                  onClick={() => setConfig({...config, secretKey: 'sybtec-' + Math.random().toString(36).substring(7)})}
-                  className="p-2 bg-slate-100 rounded text-slate-500 hover:bg-slate-200"
-                 >
-                   <RefreshCw size={16}/>
-                 </button>
-               </div>
+               <h3 className="font-bold text-sm mb-4 uppercase flex items-center gap-2"><Lock size={16}/> Sicherheit</h3>
+               <input type="text" className="admin-input font-mono text-xs" value={config.secretKey} onChange={e => setConfig({...config, secretKey: e.target.value})} />
             </div>
 
             <div className="bg-white p-6 rounded-2xl border shadow-sm">
-               <h3 className="font-bold text-sm mb-4 uppercase flex items-center gap-2"><Clock size={16}/> Sitzungsdauer</h3>
-               <p className="text-[10px] text-slate-400 mb-4 leading-relaxed">
-                 Dauer in Minuten, bis ein QR-Code erneut gescannt werden muss.
-               </p>
-               <div className="flex items-center gap-4">
-                 <input 
-                  type="number" 
-                  className="admin-input w-24 text-center font-bold" 
-                  value={config.sessionDurationMinutes} 
-                  onChange={e => setConfig({...config, sessionDurationMinutes: parseInt(e.target.value) || 1})} 
-                  min="1"
-                  max="1440"
-                 />
-                 <span className="text-xs font-bold text-slate-500 uppercase tracking-widest">Minuten</span>
-               </div>
+               <h3 className="font-bold text-sm mb-4 uppercase flex items-center gap-2"><Clock size={16}/> Sitzungsdauer (Minuten)</h3>
+               <input type="number" className="admin-input w-24 text-center font-bold" value={config.sessionDurationMinutes} onChange={e => setConfig({...config, sessionDurationMinutes: Number(e.target.value)})} min="1" />
             </div>
           </div>
         )}
       </div>
 
       <div className="p-4 sm:p-6 border-t flex justify-end gap-3 bg-white">
-        <button onClick={onClose} className="px-6 py-2.5 text-xs font-bold text-slate-400 uppercase">Schließen</button>
+        <button onClick={onClose} className="px-6 py-2.5 text-xs font-bold text-slate-400 uppercase">Abbrechen</button>
         <button onClick={handleSave} className="px-10 py-2.5 bg-[#00828c] text-white rounded-lg text-xs font-bold uppercase shadow-lg hover:bg-[#006a72] transition-all">Speichern</button>
       </div>
     </div>
