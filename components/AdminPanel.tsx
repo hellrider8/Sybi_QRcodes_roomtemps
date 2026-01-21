@@ -194,6 +194,26 @@ const AdminPanel: React.FC<AdminPanelProps> = ({ onClose, onPreviewRoom }) => {
                 <button onClick={() => setConfig({...config, apiMode: 'cloud'})} className={`flex-1 py-2 rounded text-[10px] font-bold ${config.apiMode === 'cloud' ? 'bg-white text-[#00828c]' : 'text-slate-500'}`}>CLOUD (LiveID)</button>
               </div>
 
+              {config.apiMode === 'cloud' && (
+                <div className="space-y-2">
+                  <label className="text-[9px] font-bold uppercase text-slate-400 block ml-1">Cloud Provider</label>
+                  <div className="flex p-1 bg-slate-100 rounded-lg border border-slate-200">
+                    <button 
+                      onClick={() => setConfig({...config, cloudProvider: 'gekko'})} 
+                      className={`flex-1 py-2 rounded text-[10px] font-bold transition-all ${config.cloudProvider === 'gekko' ? 'bg-[#00828c] text-white shadow-sm' : 'text-slate-500'}`}
+                    >
+                      myGEKKO
+                    </button>
+                    <button 
+                      onClick={() => setConfig({...config, cloudProvider: 'tekko'})} 
+                      className={`flex-1 py-2 rounded text-[10px] font-bold transition-all ${config.cloudProvider === 'tekko' ? 'bg-[#00828c] text-white shadow-sm' : 'text-slate-500'}`}
+                    >
+                      TEKKO
+                    </button>
+                  </div>
+                </div>
+              )}
+
               <div className="space-y-4">
                 <input type="text" placeholder={config.apiMode === 'local' ? "IP (z.B. 10.10.10.50)" : "Live-ID / Gekko-ID"} className="admin-input" value={config.apiMode === 'local' ? config.ip : config.gekkoId} onChange={e => setConfig(config.apiMode === 'local' ? {...config, ip: e.target.value} : {...config, gekkoId: e.target.value})} />
                 <div className="grid grid-cols-2 gap-3">
