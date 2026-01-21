@@ -17,19 +17,27 @@ try {
 }
 
 const db = admin.firestore();
-const configRef = db.collection('tekko_system').doc('globalConfig');
+// Wir nutzen eine flachere Struktur für maximale Kompatibilität
+const configRef = db.collection('configs').doc('global');
 
 const app = express();
 const PORT = process.env.PORT || 8080;
 
 app.use(cors());
-app.use(express.json());
+app.use(express.json({ limit: '1mb' }));
 
-// Hilfsfunktion: Entfernt alle 'undefined' Werte, da Firestore diese nicht speichert
-function sanitizeData(obj) {
-    return JSON.parse(JSON.stringify(obj, (key, value) => {
-        return value === undefined ? null : value;
-    }));
+// Hilfsfunktion: Entfernt alle 'undefined' Werte tiefgreifend
+function sanitize(obj) {
+  if (Array.isArray(obj)) {
+    return obj.map(v => sanitize(v));
+  } else if (obj !== null && typeof obj === 'object') {
+    return Object.fromEntries(
+      Object.entries(obj)
+        .filter(([_, v]) => v !== undefined)
+        .map(([k, v]) => [k, sanitize(v)])
+    );
+  }
+  return obj;
 }
 
 const DEFAULT_CONFIG = {
@@ -66,21 +74,26 @@ app.get('/api/config', async (req, res) => {
 // API: Konfiguration speichern
 app.post('/api/config', async (req, res) => {
     try {
-        // Daten säubern (undefined zu null machen)
-        const cleanData = sanitizeData(req.body);
+        const cleanData = sanitize(req.body);
         const newConfig = { 
             ...cleanData, 
             lastUpdated: Date.now() 
         };
         
-        console.log(`[FIRESTORE] Speichere Konfiguration...`);
+        console.log(`[FIRESTORE] Versuch zu speichern...`);
+        // .set() mit merge: true erstellt das Dokument, falls es fehlt
         await configRef.set(newConfig, { merge: true });
-        console.log(`[FIRESTORE] Gespeichert.`);
+        console.log(`[FIRESTORE] Speichern erfolgreich.`);
         
         res.json(newConfig);
     } catch (err) {
         console.error('[FIRESTORE-SAVE-ERROR]', err);
-        res.status(500).json({ error: 'Firestore Save Failed', details: err.message });
+        // Wir senden den Fehler zurück, aber als JSON, damit die UI ihn fangen kann
+        res.status(500).json({ 
+            error: 'Speichern in Datenbank fehlgeschlagen', 
+            details: err.message,
+            hint: 'Prüfe ob Firestore im Firebase Projekt aktiviert ist.'
+        });
     }
 });
 
@@ -92,14 +105,13 @@ app.get('/api/proxy', async (req, res) => {
     try {
         const fetchOptions = {
             method: 'GET',
-            headers: {}
+            headers: {
+                'Accept': 'application/json'
+            }
         };
 
         if (req.headers.authorization) {
             fetchOptions.headers['Authorization'] = req.headers.authorization;
-        }
-        if (req.headers.accept) {
-            fetchOptions.headers['Accept'] = req.headers.accept;
         }
 
         const response = await fetch(targetUrl, fetchOptions);
@@ -110,7 +122,7 @@ app.get('/api/proxy', async (req, res) => {
         res.send(data);
     } catch (err) {
         console.error('[PROXY-ERROR]', err.message);
-        res.status(502).send('Proxy Request Failed');
+        res.status(502).send('Proxy Request Failed: ' + err.message);
     }
 });
 
