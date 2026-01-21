@@ -18,7 +18,6 @@ class GekkoService {
     password: '',
     useMock: true,
     secretKey: 'sybtec-static-access-key-2024',
-    corsProxy: '',
     rooms: [],
     sessionDurationMinutes: 15,
     minOffset: -3.0,
@@ -38,10 +37,9 @@ class GekkoService {
       if (response.ok) {
         const serverConfig = await response.json();
         this.config = { ...this.config, ...serverConfig };
-        console.log(`[GEKKO-SERVICE] Konfiguration geladen (Stand: ${new Date(this.config.lastUpdated || 0).toLocaleTimeString()})`);
       }
     } catch (e) {
-      console.error("[GEKKO-SERVICE] Fehler beim Laden der Server-Config", e);
+      console.error("[GEKKO-SERVICE] Load Config Error", e);
     }
     return this.config;
   }
@@ -57,13 +55,14 @@ class GekkoService {
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify(this.config)
       });
-      if (response.ok) {
-        const updated = await response.json();
-        this.config.lastUpdated = updated.lastUpdated;
-        console.log('[GEKKO-SERVICE] Konfiguration erfolgreich auf Server gespeichert.');
+      if (!response.ok) {
+        const err = await response.json();
+        throw new Error(err.details || 'Save failed');
       }
+      const updated = await response.json();
+      this.config.lastUpdated = updated.lastUpdated;
     } catch (e) {
-      console.error("[GEKKO-SERVICE] Fehler beim Speichern auf Server", e);
+      console.error("[GEKKO-SERVICE] Save Config Error", e);
       throw e;
     }
   }
@@ -89,14 +88,9 @@ class GekkoService {
       while (base64.length % 4 !== 0) base64 += '=';
       const decodedStr = atob(base64);
       const data = JSON.parse(decodedStr);
-      
-      if (data.s && data.s !== this.config.secretKey) {
-        return null;
-      }
+      if (data.s && data.s !== this.config.secretKey) return null;
       return { roomId: data.r };
-    } catch (e: any) {
-      return null;
-    }
+    } catch (e) { return null; }
   }
 
   setCurrentRoom(id: string) {
@@ -130,22 +124,20 @@ class GekkoService {
   private getFetchOptions(): RequestInit {
     const headers: Record<string, string> = { 'Accept': 'application/json' };
     if (this.config.apiMode === 'local') {
-      const authString = `${this.config.username}:${this.config.password}`;
-      headers['Authorization'] = 'Basic ' + btoa(authString);
+      headers['Authorization'] = 'Basic ' + btoa(`${this.config.username}:${this.config.password}`);
     }
     return { mode: 'cors', cache: 'no-cache', headers };
   }
 
   async testConnection(): Promise<{ success: boolean; message: string }> {
-    if (this.config.useMock) return { success: true, message: "Simulation ist AKTIV (OK)" };
+    if (this.config.useMock) return { success: true, message: "Simulation (OK)" };
     const url = this.getUrl('/roomtemps/');
     try {
       const response = await fetch(url, this.getFetchOptions());
-      if (response.ok) return { success: true, message: "Verbindung zum echten Gekko erfolgreich!" };
-      const errText = await response.text();
-      return { success: false, message: `HTTP ${response.status}: ${errText.substring(0, 50)}` };
-    } catch (e: any) {
-      return { success: false, message: "Server nicht erreichbar. IP oder Cloud-ID prüfen." };
+      if (response.ok) return { success: true, message: "Verbindung erfolgreich!" };
+      return { success: false, message: `HTTP ${response.status}` };
+    } catch (e) {
+      return { success: false, message: "Server nicht erreichbar." };
     }
   }
 
@@ -162,53 +154,41 @@ class GekkoService {
     }
     const url = this.getUrl('/roomtemps/');
     try {
-      console.log("[GEKKO-SERVICE] Suche Räume unter:", url);
       const response = await fetch(url, this.getFetchOptions());
-      if (!response.ok) {
-        throw new Error(`HTTP ${response.status} beim Abruf der Raumliste`);
-      }
-      
       const rawData = await response.json();
-      console.log("[GEKKO-SERVICE] Rohdaten empfangen:", rawData);
       
-      // Unterstützung für verschiedene Gekko-Strukturen (Array oder Objekt)
       const items = rawData.roomtemps || rawData;
       const rooms: RoomDefinition[] = [];
       
       if (Array.isArray(items)) {
-        console.log("[GEKKO-SERVICE] Verarbeite Array-Struktur");
-        items.forEach((item: any, index: number) => {
-          if (item && typeof item === 'object') {
-            const id = item.id || `item${index}`;
+        // Fall: Gekko liefert Array [{id: "...", name: "..."}]
+        items.forEach((item: any) => {
+          if (item && item.id) {
             rooms.push({ 
-              id: String(id), 
-              name: item.name || String(id), 
+              id: String(item.id), 
+              name: item.name || String(item.id), 
               category: item.page || "RÄUME", 
               enabled: true 
             });
           }
         });
-      } else if (typeof items === 'object' && items !== null) {
-        console.log("[GEKKO-SERVICE] Verarbeite Objekt-Struktur");
-        for (const key in items) {
-          if (key.startsWith('_')) continue; // Metadaten überspringen
-          const item = items[key];
-          if (item && typeof item === 'object') {
+      } else {
+        // Fall: Gekko liefert Objekt {"item0": {name: "..."}}
+        for (const id in items) {
+          if (id.startsWith('_')) continue;
+          if (typeof items[id] === 'object' && items[id] !== null) {
             rooms.push({ 
-              id: key, 
-              name: item.name || key, 
-              category: item.page || "RÄUME", 
+              id, 
+              name: items[id].name || id, 
+              category: items[id].page || "RÄUME", 
               enabled: true 
             });
           }
         }
       }
-
-      console.log(`[GEKKO-SERVICE] ${rooms.length} Räume validiert.`);
-      return { rooms, rawData, debugInfo: `Suche beendet: ${rooms.length} Räume gefunden.` };
+      return { rooms, rawData, debugInfo: `Gefunden: ${rooms.length}` };
     } catch (e: any) {
-      console.error("[GEKKO-SERVICE] Discovery Error:", e);
-      return { rooms: [], rawData: null, debugInfo: "Import fehlgeschlagen", error: e.message };
+      return { rooms: [], rawData: null, debugInfo: "Fehler bei Suche", error: e.message };
     }
   }
 
@@ -224,15 +204,11 @@ class GekkoService {
 
     const url = this.getUrl('/roomtemps/status');
     const response = await fetch(url, this.getFetchOptions());
-    if (!response.ok) throw new Error(`HTTP Error ${response.status}`);
     const allStatusData = await response.json();
-    
     const itemData = allStatusData[roomId];
-    if (!itemData) throw new Error(`Raum ${roomId} nicht im Payload`);
+    if (!itemData) throw new Error(`Raum ${roomId} fehlt`);
 
     const vals = (itemData.sumstate?.value || itemData.sumstate || "").split(';');
-    this.lastRawStatus = itemData.sumstate?.value || itemData.sumstate || "";
-
     return {
       istTemp: parseFloat(vals[0]) || 0,
       sollTemp: parseFloat(vals[1]) || 0,
@@ -261,9 +237,7 @@ class GekkoService {
     try {
       const response = await fetch(url, this.getFetchOptions());
       return response.ok;
-    } catch (e) {
-      return false;
-    }
+    } catch (e) { return false; }
   }
 }
 

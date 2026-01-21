@@ -6,21 +6,17 @@ const esbuild = require('esbuild');
 const fs = require('fs');
 const admin = require('firebase-admin');
 
-// Firebase Admin initialisieren
-// Im Google Cloud Run Umfeld werden die Credentials automatisch vom Dienstkonto übernommen.
+// Firebase Admin sicher initialisieren
 try {
     if (!admin.apps.length) {
-        admin.initializeApp({
-            // projectId wird automatisch erkannt, wenn im GCP Umfeld
-        });
-        console.log('[FIREBASE] Firebase Admin erfolgreich initialisiert.');
+        admin.initializeApp();
+        console.log('[FIREBASE] Admin SDK initialisiert.');
     }
 } catch (e) {
-    console.error('[FIREBASE] Fehler bei der Initialisierung:', e.message);
+    console.error('[FIREBASE] Kritischer Fehler bei Initialisierung:', e.message);
 }
 
 const db = admin.firestore();
-// Wir nutzen eine eindeutige Collection für die TEKKO Einstellungen
 const configRef = db.collection('tekko_system').doc('globalConfig');
 
 const app = express();
@@ -29,7 +25,13 @@ const PORT = process.env.PORT || 8080;
 app.use(cors());
 app.use(express.json());
 
-// Standard-Konfiguration
+// Hilfsfunktion: Entfernt alle 'undefined' Werte, da Firestore diese nicht speichert
+function sanitizeData(obj) {
+    return JSON.parse(JSON.stringify(obj, (key, value) => {
+        return value === undefined ? null : value;
+    }));
+}
+
 const DEFAULT_CONFIG = {
     apiMode: 'local',
     cloudProvider: 'gekko',
@@ -52,15 +54,11 @@ app.get('/api/config', async (req, res) => {
     try {
         const doc = await configRef.get();
         if (!doc.exists) {
-            console.log('[FIRESTORE] Keine Konfiguration gefunden, sende Defaults.');
             return res.json(DEFAULT_CONFIG);
         }
-        console.log('[FIRESTORE] Konfiguration geladen.');
-        const data = doc.data();
-        res.json({ ...DEFAULT_CONFIG, ...data });
+        res.json({ ...DEFAULT_CONFIG, ...doc.data() });
     } catch (err) {
-        console.error('[FIRESTORE-GET-ERROR]', err.message);
-        // Fallback auf Default, damit die App nicht abstürzt
+        console.error('[CONFIG-GET-ERROR]', err.message);
         res.json(DEFAULT_CONFIG);
     }
 });
@@ -68,18 +66,21 @@ app.get('/api/config', async (req, res) => {
 // API: Konfiguration speichern
 app.post('/api/config', async (req, res) => {
     try {
+        // Daten säubern (undefined zu null machen)
+        const cleanData = sanitizeData(req.body);
         const newConfig = { 
-            ...req.body, 
+            ...cleanData, 
             lastUpdated: Date.now() 
         };
         
-        console.log(`[FIRESTORE] Speichere Konfiguration (Version: ${newConfig.lastUpdated})...`);
+        console.log(`[FIRESTORE] Speichere Konfiguration...`);
         await configRef.set(newConfig, { merge: true });
+        console.log(`[FIRESTORE] Gespeichert.`);
         
         res.json(newConfig);
     } catch (err) {
-        console.error('[FIRESTORE-SAVE-ERROR]', err.message);
-        res.status(500).send('Fehler beim Speichern in Firestore: ' + err.message);
+        console.error('[FIRESTORE-SAVE-ERROR]', err);
+        res.status(500).json({ error: 'Firestore Save Failed', details: err.message });
     }
 });
 
@@ -106,7 +107,6 @@ app.get('/api/proxy', async (req, res) => {
         
         res.status(response.status);
         res.set('Content-Type', response.headers.get('content-type') || 'application/json');
-        res.set('Access-Control-Allow-Origin', '*');
         res.send(data);
     } catch (err) {
         console.error('[PROXY-ERROR]', err.message);
@@ -114,7 +114,6 @@ app.get('/api/proxy', async (req, res) => {
     }
 });
 
-// On-the-fly transpilation für TS/TSX
 app.get(['/**/*.tsx', '/**/*.ts', '/*.tsx', '/*.ts'], async (req, res, next) => {
     const filePath = path.join(__dirname, req.path);
     if (fs.existsSync(filePath)) {
@@ -134,10 +133,8 @@ app.get(['/**/*.tsx', '/**/*.ts', '/*.tsx', '/*.ts'], async (req, res, next) => 
 });
 
 app.use(express.static(__dirname));
-
 app.get('*', (req, res) => res.sendFile(path.join(__dirname, 'index.html')));
 
 app.listen(PORT, '0.0.0.0', () => {
     console.log(`TEKKO Server running on port ${PORT}`);
-    console.log(`Persistence: Google Cloud Firestore (Collection: tekko_system)`);
 });
