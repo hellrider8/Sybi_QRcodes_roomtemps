@@ -9,13 +9,18 @@ const admin = require('firebase-admin');
 // Firebase Admin initialisieren
 // Im Google Cloud Run Umfeld werden die Credentials automatisch vom Dienstkonto übernommen.
 try {
-    admin.initializeApp();
-    console.log('[FIREBASE] Firebase Admin erfolgreich initialisiert.');
+    if (!admin.apps.length) {
+        admin.initializeApp({
+            // projectId wird automatisch erkannt, wenn im GCP Umfeld
+        });
+        console.log('[FIREBASE] Firebase Admin erfolgreich initialisiert.');
+    }
 } catch (e) {
     console.error('[FIREBASE] Fehler bei der Initialisierung:', e.message);
 }
 
 const db = admin.firestore();
+// Wir nutzen eine eindeutige Collection für die TEKKO Einstellungen
 const configRef = db.collection('tekko_system').doc('globalConfig');
 
 const app = express();
@@ -51,10 +56,11 @@ app.get('/api/config', async (req, res) => {
             return res.json(DEFAULT_CONFIG);
         }
         console.log('[FIRESTORE] Konfiguration geladen.');
-        res.json({ ...DEFAULT_CONFIG, ...doc.data() });
+        const data = doc.data();
+        res.json({ ...DEFAULT_CONFIG, ...data });
     } catch (err) {
         console.error('[FIRESTORE-GET-ERROR]', err.message);
-        // Fallback auf Default, falls Firestore noch nicht bereit ist
+        // Fallback auf Default, damit die App nicht abstürzt
         res.json(DEFAULT_CONFIG);
     }
 });

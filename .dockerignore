@@ -1,3 +1,4 @@
+
 node_modules
 npm-debug.log
 .git
@@ -6,6 +7,7 @@ npm-debug.log
 config.json
 Dockerfile
 dockerfile.txt
+procfile.txt
 .dockerignore
 dist
 *.md

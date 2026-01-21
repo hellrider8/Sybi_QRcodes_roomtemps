@@ -1,6 +1,6 @@
 
 import React, { useState, useEffect, useRef } from 'react';
-import { Save, Plus, Trash2, X, Shield, RefreshCw, Globe, Wifi, CheckCircle2, AlertCircle, Copy, Search, Lock, Clock, Download, SlidersHorizontal } from 'lucide-react';
+import { Save, Plus, Trash2, X, Shield, RefreshCw, Globe, Wifi, CheckCircle2, AlertCircle, Copy, Search, Lock, Clock, Download, SlidersHorizontal, Info } from 'lucide-react';
 import { gekkoService } from '../services/gekkoService.ts';
 import { RoomDefinition, GekkoConfig } from '../types.ts';
 import { QRCodeCanvas } from 'qrcode.react';
@@ -19,6 +19,11 @@ const AdminPanel: React.FC<AdminPanelProps> = ({ onClose, onPreviewRoom }) => {
   const [testResult, setTestResult] = useState<{success?: boolean, msg?: string}>({});
   const [isExporting, setIsExporting] = useState(false);
   const [isSaving, setIsSaving] = useState(false);
+
+  // Synchronisiere den Service-Status mit dem UI-Status bei jeder Änderung
+  useEffect(() => {
+    gekkoService.updateInternalConfig(config);
+  }, [config]);
 
   const handleSave = async () => {
     setIsSaving(true);
@@ -57,7 +62,8 @@ const AdminPanel: React.FC<AdminPanelProps> = ({ onClose, onPreviewRoom }) => {
 
   const testConnection = async () => {
     setIsTesting(true);
-    // Wir speichern nicht permanent, sondern setzen nur temporär für den Test
+    setTestResult({});
+    // Service ist durch useEffect bereits auf dem Stand von 'config'
     const res = await gekkoService.testConnection();
     setTestResult({ success: res.success, msg: res.message });
     setIsTesting(false);
@@ -66,16 +72,23 @@ const AdminPanel: React.FC<AdminPanelProps> = ({ onClose, onPreviewRoom }) => {
   const handleDiscover = async () => {
     setIsDiscovering(true);
     try {
+      // Service ist bereits aktuell
       const result = await gekkoService.discoverRooms();
       if (result.rooms && result.rooms.length > 0) {
         const existingIds = new Set(config.rooms.map(r => r.id));
         const newRooms = result.rooms.filter(r => !existingIds.has(r.id));
-        if (newRooms.length === 0) {
+        if (newRooms.length === 0 && config.rooms.length > 0) {
           alert("Keine neuen Räume gefunden.");
         } else {
-          const updatedRooms = [...config.rooms, ...newRooms];
-          setConfig({ ...config, rooms: updatedRooms });
-          alert(`${newRooms.length} neue Räume gefunden.`);
+          // Falls Simulation aktiv war, fragen ob überschrieben werden soll
+          if (config.useMock && result.rooms[0].category !== 'DEMO') {
+             setConfig({ ...config, rooms: result.rooms, useMock: false });
+             alert("Echte Räume gefunden. Simulation wurde deaktiviert.");
+          } else {
+             const updatedRooms = [...config.rooms, ...newRooms];
+             setConfig({ ...config, rooms: updatedRooms });
+             alert(`${newRooms.length} neue Räume gefunden.`);
+          }
         }
       }
     } catch (e) {
@@ -244,10 +257,22 @@ const AdminPanel: React.FC<AdminPanelProps> = ({ onClose, onPreviewRoom }) => {
                  {isDiscovering ? <RefreshCw size={12} className="animate-spin"/> : <Search size={12}/>} Suchen
                </button>
              </div>
+
+             {config.useMock && (
+               <div className="bg-amber-50 border border-amber-200 p-4 rounded-xl flex gap-3 items-center mb-6">
+                 <Info className="text-amber-500" size={20}/>
+                 <p className="text-[10px] text-amber-800 font-medium">Simulation ist AKTIV. Es werden Demodaten angezeigt. Schalte "Simulation" im Reiter Verbindung aus, um echte Daten zu sehen.</p>
+               </div>
+             )}
+
+             {config.rooms.length === 0 && !isDiscovering && (
+               <div className="text-center py-20 opacity-30">Keine Räume gefunden. Nutze die Suche.</div>
+             )}
+
              {config.rooms.map((r, i) => (
                <div key={i} className="bg-white p-5 rounded-xl border shadow-sm">
                  <div className="flex items-center justify-between mb-4 border-b pb-2">
-                    <span className="text-[10px] font-bold text-[#00828c]">ID: {r.id}</span>
+                    <span className="text-[10px] font-bold text-[#00828c]">ID: {r.id} {r.category === 'DEMO' && '(Demo)'}</span>
                     <button onClick={() => setConfig({...config, rooms: config.rooms.filter((_, idx) => idx !== i)})} className="text-red-400"><Trash2 size={18}/></button>
                  </div>
                  <input type="text" className="admin-input" value={r.name} onChange={e => updateRoom(i, {name: e.target.value})} />

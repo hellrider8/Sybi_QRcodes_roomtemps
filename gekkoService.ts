@@ -46,7 +46,7 @@ class GekkoService {
     return this.config;
   }
 
-  // Fix: Added missing method to update internal config state, used by AdminPanel for live preview synchronization.
+  // WICHTIG: Erlaubt dem AdminPanel, den Service temporär zu aktualisieren
   updateInternalConfig(newConfig: GekkoConfig) {
     this.config = { ...newConfig };
   }
@@ -137,7 +137,6 @@ class GekkoService {
     return { mode: 'cors', cache: 'no-cache', headers };
   }
 
-  // Fix: Improved status messages for connection tests to provide clearer feedback in AdminPanel.
   async testConnection(): Promise<{ success: boolean; message: string }> {
     if (this.config.useMock) return { success: true, message: "Simulation ist AKTIV (OK)" };
     const url = this.getUrl('/roomtemps/');
@@ -150,7 +149,6 @@ class GekkoService {
     }
   }
 
-  // Fix: Added descriptive labels for demo rooms and improved logging during discovery.
   async discoverRooms(): Promise<DiscoveryResult> {
     if (this.config.useMock) {
       return {
