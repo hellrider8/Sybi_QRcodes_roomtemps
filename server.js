@@ -5,6 +5,10 @@ const cors = require('cors');
 const esbuild = require('esbuild');
 const fs = require('fs');
 const admin = require('firebase-admin');
+const { getFirestore } = require('firebase-admin/firestore');
+
+const app = express();
+const PORT = process.env.PORT || 8080;
 
 // Firebase Admin sicher initialisieren
 try {
@@ -13,24 +17,31 @@ try {
         console.log('[FIREBASE] Admin SDK initialisiert.');
     }
 } catch (e) {
-    console.error('[FIREBASE] Kritischer Fehler bei Initialisierung:', e.message);
+    console.error('[FIREBASE] Initialisierungsfehler (nicht kritisch für Start):', e.message);
 }
 
 /** 
- * WICHTIG: Laut deinem Screenshot ist die Datenbank-ID "tekkoconfig".
- * admin.firestore() ohne Parameter sucht nach "(default)".
- * Wir übergeben hier explizit deine ID.
+ * KORREKTE SYNTAX für benannte Datenbanken in Node.js:
+ * Wir nutzen getFirestore('ID') statt admin.firestore('ID')
  */
-const db = admin.firestore('tekkoconfig');
-const configRef = db.collection('configs').doc('global');
+let db;
+let configRef;
 
-const app = express();
-const PORT = process.env.PORT || 8080;
+try {
+    // Versuche die benannte Datenbank 'tekkoconfig' zu laden
+    db = getFirestore('tekkoconfig');
+    configRef = db.collection('configs').doc('global');
+    console.log('[FIRESTORE] Verbindung zu Datenbank "tekkoconfig" vorbereitet.');
+} catch (e) {
+    console.error('[FIRESTORE] Fehler beim Zugriff auf "tekkoconfig". Nutze Fallback auf Default.', e.message);
+    db = admin.firestore(); // Fallback auf Standard-DB
+    configRef = db.collection('configs').doc('global');
+}
 
 app.use(cors());
 app.use(express.json({ limit: '1mb' }));
 
-// Hilfsfunktion: Entfernt alle 'undefined' Werte tiefgreifend, da Firestore diese ablehnt
+// Hilfsfunktion: Entfernt alle 'undefined' Werte tiefgreifend
 function sanitize(obj) {
   if (Array.isArray(obj)) {
     return obj.map(v => sanitize(v));
@@ -66,7 +77,6 @@ app.get('/api/config', async (req, res) => {
     try {
         const doc = await configRef.get();
         if (!doc.exists) {
-            console.log('[FIRESTORE] Dokument existiert noch nicht, sende Standardwerte.');
             return res.json(DEFAULT_CONFIG);
         }
         res.json({ ...DEFAULT_CONFIG, ...doc.data() });
@@ -85,8 +95,7 @@ app.post('/api/config', async (req, res) => {
             lastUpdated: Date.now() 
         };
         
-        console.log(`[FIRESTORE] Speichere in Datenbank 'tekkoconfig'...`);
-        // .set() mit merge: true erstellt das Dokument automatisch
+        console.log(`[FIRESTORE] Speichere Konfiguration...`);
         await configRef.set(newConfig, { merge: true });
         console.log(`[FIRESTORE] Speichern erfolgreich.`);
         
@@ -95,8 +104,7 @@ app.post('/api/config', async (req, res) => {
         console.error('[FIRESTORE-SAVE-ERROR]', err);
         res.status(500).json({ 
             error: 'Datenbank-Fehler', 
-            details: err.message,
-            hint: 'Stelle sicher, dass die Datenbank-ID "tekkoconfig" korrekt ist und der Service-Account Schreibrechte hat.'
+            details: err.message
         });
     }
 });
@@ -123,7 +131,6 @@ app.get('/api/proxy', async (req, res) => {
         res.set('Content-Type', response.headers.get('content-type') || 'application/json');
         res.send(data);
     } catch (err) {
-        console.error('[PROXY-ERROR]', err.message);
         res.status(502).send('Proxy Request Failed');
     }
 });
@@ -150,5 +157,5 @@ app.use(express.static(__dirname));
 app.get('*', (req, res) => res.sendFile(path.join(__dirname, 'index.html')));
 
 app.listen(PORT, '0.0.0.0', () => {
-    console.log(`TEKKO Server running on port ${PORT} (Database: tekkoconfig)`);
+    console.log(`TEKKO Server running on port ${PORT}`);
 });
