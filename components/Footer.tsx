@@ -29,11 +29,13 @@ const Footer: React.FC<FooterProps> = ({ hauptMode, subMode, feuchte }) => {
             </button>
           </div>
 
-          {/* Feuchte */}
-          <div className="flex justify-between items-center text-white pt-2 border-t border-white/5">
-            <span className="text-xs font-extralight uppercase tracking-widest opacity-80">Feuchte</span>
-            <span className="text-sm font-light tracking-wider mr-2">{feuchte.toFixed(1)} % rF</span>
-          </div>
+          {/* Feuchte - Nur anzeigen wenn vorhanden (>= 0) */}
+          {feuchte >= 0 && (
+            <div className="flex justify-between items-center text-white pt-2 border-t border-white/5">
+              <span className="text-xs font-extralight uppercase tracking-widest opacity-80">Feuchte</span>
+              <span className="text-sm font-light tracking-wider mr-2">{feuchte.toFixed(1)} % rF</span>
+            </div>
+          )}
 
           {/* Branding Link */}
           <div className="text-center pt-6 opacity-30 hover:opacity-100 transition-opacity">

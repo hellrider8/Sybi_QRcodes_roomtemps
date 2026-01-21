@@ -10,7 +10,7 @@ import { GekkoStatus } from './types.ts';
 import { AlertCircle } from 'lucide-react';
 
 const STATUS_POLLING_MS = 10000;
-const EXPIRY_CHECK_MS = 10000;
+const EXPIRY_CHECK_MS = 5000; // Häufigere Prüfung für bessere User Experience
 const SYNC_LOCK_TIMEOUT_MS = 5000; 
 
 const App: React.FC = () => {
@@ -49,15 +49,20 @@ const App: React.FC = () => {
     if (showAdmin || isPreview) return;
     
     const sessionStartStr = localStorage.getItem('gekko_session_start');
-    if (sessionStartStr) {
-      const sessionStart = parseInt(sessionStartStr);
-      const elapsedMs = Date.now() - sessionStart;
-      const limitMs = globalSettings.sessionDurationMinutes * 60 * 1000;
-      
-      if (elapsedMs > limitMs) {
-        setIsExpired(true);
-        setExpiryReason("Sitzungszeit abgelaufen");
-      }
+    if (!sessionStartStr) {
+      // Wenn kein Startzeitpunkt da ist, ist die Session ungültig/abgelaufen
+      setIsExpired(true);
+      setExpiryReason("Keine aktive Sitzung");
+      return;
+    }
+
+    const sessionStart = parseInt(sessionStartStr);
+    const elapsedMs = Date.now() - sessionStart;
+    const limitMs = globalSettings.sessionDurationMinutes * 60 * 1000;
+    
+    if (elapsedMs > limitMs) {
+      setIsExpired(true);
+      setExpiryReason("Sitzungszeit abgelaufen");
     }
   }, [globalSettings.sessionDurationMinutes, showAdmin, isPreview]);
 
@@ -86,6 +91,16 @@ const App: React.FC = () => {
     } catch (e) {}
   }, [isExpired, loading, currentRoomId, showAdmin, optimisticOffset]);
 
+  const handleLogout = () => {
+    localStorage.removeItem('gekko_session_start');
+    localStorage.removeItem('gekko_current_room');
+    setIsExpired(true);
+    setExpiryReason("Abgemeldet");
+    setCurrentRoomId(null);
+    // URL säubern ohne Refresh
+    window.history.replaceState({}, '', window.location.origin + window.location.pathname);
+  };
+
   useEffect(() => {
     const init = async () => {
       const params = new URLSearchParams(window.location.search);
@@ -108,20 +123,20 @@ const App: React.FC = () => {
           setExpiryReason("Ungültiger QR-Code");
         }
       } else if (roomIdDirect) {
-        // Bei direktem Raum-Parameter prüfen wir, ob eine Sitzung existiert
         setCurrentRoomId(roomIdDirect);
         gekkoService.setCurrentRoom(roomIdDirect);
+        // Prüfen ob Session noch gilt
         checkExpiry();
       } else {
-        // Weder Token noch Raum -> Abgelaufen
+        // Gar keine Parameter -> Gilt als abgelaufen/kein Zugriff
         setIsExpired(true);
+        setExpiryReason("Bitte QR-Code scannen");
       }
       setLoading(false);
     };
     init();
   }, [checkExpiry]);
 
-  // Laufende Überprüfung der Zeit
   useEffect(() => {
     if (!loading && !isExpired && !showAdmin && !isPreview) {
       const interval = setInterval(checkExpiry, EXPIRY_CHECK_MS);
@@ -181,7 +196,9 @@ const App: React.FC = () => {
   }, [refreshData, currentRoomId, showAdmin, loading, isExpired]);
 
   if (loading) return <div className="min-h-screen flex items-center justify-center bg-[#e0e4e7]"><div className="w-10 h-10 border-4 border-[#00828c] border-t-transparent rounded-full animate-spin"></div></div>;
+  
   if (showAdmin) return <AdminPanel onClose={async () => { await loadGlobalConfig(); setShowAdmin(false); }} onPreviewRoom={(id) => { setIsPreview(true); setCurrentRoomId(id); gekkoService.setCurrentRoom(id); setShowAdmin(false); }} />;
+  
   if (!currentRoomId || isExpired) return <div className="min-h-screen max-w-md mx-auto bg-[#00828c] relative"><ExpiredScreen reason={expiryReason} sessionMinutes={globalSettings.sessionDurationMinutes} /><div className="absolute top-0 w-full h-32 z-[60]" onMouseDown={handleAdminStart} onMouseUp={handleAdminEnd} onTouchStart={handleAdminStart} onTouchEnd={handleAdminEnd} /></div>;
 
   return (
@@ -195,11 +212,7 @@ const App: React.FC = () => {
         <Header 
           roomName={status?.roomName || ""} 
           category={status?.category || ""} 
-          onBack={isPreview ? () => window.location.reload() : () => {
-            localStorage.removeItem('gekko_session_start');
-            localStorage.removeItem('gekko_current_room');
-            window.location.reload();
-          }} 
+          onBack={isPreview ? () => window.location.reload() : handleLogout} 
           showBack={true} 
           isLogout={!isPreview}
           isDemo={useMock}
