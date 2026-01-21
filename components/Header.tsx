@@ -1,6 +1,6 @@
 
 import React, { useState, useEffect } from 'react';
-import { ChevronLeft, LogOut } from 'lucide-react';
+import { ChevronLeft, LogOut, Globe, FlaskConical } from 'lucide-react';
 
 interface HeaderProps {
   roomName: string;
@@ -8,9 +8,10 @@ interface HeaderProps {
   onBack?: () => void;
   showBack?: boolean;
   isLogout?: boolean;
+  isDemo?: boolean;
 }
 
-const Header: React.FC<HeaderProps> = ({ roomName, category, onBack, showBack, isLogout }) => {
+const Header: React.FC<HeaderProps> = ({ roomName, category, onBack, showBack, isLogout, isDemo }) => {
   const [time, setTime] = useState(new Date());
 
   useEffect(() => {
@@ -35,8 +36,19 @@ const Header: React.FC<HeaderProps> = ({ roomName, category, onBack, showBack, i
       </div>
 
       <div className="flex-1 text-center px-12 sm:px-16">
-        <h1 className="text-[10px] font-extralight leading-none tracking-[0.2em] opacity-70 mb-1 uppercase">Raumregelung</h1>
-        <p className="text-[20px] font-bold opacity-100 uppercase tracking-tight leading-tight">
+        <div className="flex items-center justify-center gap-1 mb-1">
+          <h1 className="text-[10px] font-extralight leading-none tracking-[0.2em] opacity-70 uppercase">Raumregelung</h1>
+          {isDemo ? (
+            <span className="flex items-center gap-0.5 px-1.5 py-0.5 bg-amber-500 text-[8px] font-bold rounded text-white animate-pulse">
+              <FlaskConical size={8} /> DEMO
+            </span>
+          ) : (
+            <span className="flex items-center gap-0.5 px-1.5 py-0.5 bg-green-500 text-[8px] font-bold rounded text-white">
+              <Globe size={8} /> LIVE
+            </span>
+          )}
+        </div>
+        <p className="text-[18px] sm:text-[20px] font-bold opacity-100 uppercase tracking-tight leading-tight truncate">
           <span className="font-extralight opacity-80">{category || 'RÄUME'}</span> | <span>{roomName}</span>
         </p>
       </div>
@@ -49,9 +61,9 @@ const Header: React.FC<HeaderProps> = ({ roomName, category, onBack, showBack, i
             title={isLogout ? "Abmelden" : "Zurück"}
           >
             {isLogout ? (
-              <LogOut size={22} strokeWidth={1.5} className="cursor-pointer text-white/70 hover:text-white" />
+              <LogOut size={20} strokeWidth={1.5} className="cursor-pointer text-white/70 hover:text-white" />
             ) : (
-              <ChevronLeft size={28} strokeWidth={1} className="cursor-pointer" />
+              <ChevronLeft size={24} strokeWidth={1.5} className="cursor-pointer" />
             )}
           </button>
         </div>

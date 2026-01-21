@@ -8,9 +8,10 @@ import ExpiredScreen from './components/ExpiredScreen.tsx';
 import AdminPanel from './components/AdminPanel.tsx';
 import { gekkoService } from './services/gekkoService.ts';
 import { GekkoStatus } from './types.ts';
+import { AlertCircle } from 'lucide-react';
 
 const STATUS_POLLING_MS = 10000;
-const SYNC_CHECK_MS = 10000; // Prüfe alle 10s auf neue Config am Server
+const SYNC_CHECK_MS = 10000; 
 const SYNC_LOCK_TIMEOUT_MS = 5000; 
 
 const App: React.FC = () => {
@@ -21,6 +22,7 @@ const App: React.FC = () => {
   const [showAdmin, setShowAdmin] = useState(false);
   const [currentRoomId, setCurrentRoomId] = useState<string | null>(null);
   const [isPreview, setIsPreview] = useState(false);
+  const [useMock, setUseMock] = useState(true);
   
   const [optimisticOffset, setOptimisticOffset] = useState<number | null>(null);
   const lastClickTime = useRef<number>(0);
@@ -47,6 +49,7 @@ const App: React.FC = () => {
   const loadGlobalConfig = async () => {
     const config = await gekkoService.loadConfig();
     lastConfigTime.current = config.lastUpdated || 0;
+    setUseMock(config.useMock);
     setGlobalSettings({
       sessionDurationMinutes: Number(config.sessionDurationMinutes) || 15,
       minOffset: config.minOffset !== undefined ? Number(config.minOffset) : -3.0,
@@ -80,12 +83,11 @@ const App: React.FC = () => {
     } catch (e) {}
   }, [isExpired, loading, currentRoomId, showAdmin, optimisticOffset]);
 
-  // Synchronisierung bei Tab-Focus oder Intervall
   useEffect(() => {
     const syncWithServer = async () => {
       const config = await gekkoService.loadConfig();
       if (config.lastUpdated && config.lastUpdated > lastConfigTime.current) {
-        console.log('[APP] Neue Konfiguration vom Server erkannt. Synchronisiere...');
+        console.log('[APP] Neue Konfiguration erkannt.');
         await loadGlobalConfig();
         if (currentRoomId) refreshData();
       }
@@ -230,8 +232,20 @@ const App: React.FC = () => {
 
   return (
     <div className="min-h-screen flex flex-col bg-[#e0e4e7] max-w-md mx-auto shadow-2xl relative select-none overflow-x-hidden">
+      {useMock && (
+        <div className="bg-amber-500 text-white text-[9px] font-bold py-1 px-4 flex items-center justify-center gap-2 z-50 shadow-sm uppercase tracking-widest">
+          <AlertCircle size={10} /> Simulationsmodus aktiv
+        </div>
+      )}
       <div onMouseDown={handleAdminStart} onMouseUp={handleAdminEnd} onTouchStart={handleAdminStart} onTouchEnd={handleAdminEnd}>
-        <Header roomName={status?.roomName || ""} category={status?.category || ""} onBack={isPreview ? () => window.location.reload() : logout} showBack={true} isLogout={!isPreview} />
+        <Header 
+          roomName={status?.roomName || ""} 
+          category={status?.category || ""} 
+          onBack={isPreview ? () => window.location.reload() : logout} 
+          showBack={true} 
+          isLogout={!isPreview}
+          isDemo={useMock}
+        />
       </div>
       <main className="flex-1 flex flex-col relative pb-4">
         {status && <MainControl soll={status.sollTemp} ist={status.istTemp} offset={status.offset} mode={status.betriebsart} onAdjust={handleTempAdjust} stepSize={Number(globalSettings.stepSize)} />}
