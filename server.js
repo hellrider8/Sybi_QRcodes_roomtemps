@@ -12,30 +12,35 @@ const CONFIG_FILE = path.join(__dirname, 'config.json');
 app.use(cors());
 app.use(express.json());
 
+// Standard-Konfiguration
+const DEFAULT_CONFIG = {
+    apiMode: 'local',
+    cloudProvider: 'gekko',
+    ip: '',
+    gekkoId: '',
+    username: '',
+    password: '',
+    useMock: true,
+    secretKey: 'sybtec-static-access-key-2024',
+    rooms: [],
+    minOffset: -3,
+    maxOffset: 3,
+    stepSize: 0.5,
+    sessionDurationMinutes: 15
+};
+
 const readConfig = () => {
     if (!fs.existsSync(CONFIG_FILE)) {
-        return {
-            apiMode: 'local',
-            cloudProvider: 'gekko',
-            ip: '',
-            gekkoId: '',
-            username: '',
-            password: '',
-            useMock: true,
-            secretKey: 'sybtec-static-access-key-2024',
-            rooms: [],
-            minOffset: -3,
-            maxOffset: 3,
-            stepSize: 0.5,
-            sessionDurationMinutes: 15
-        };
+        console.log('[CONFIG] Keine config.json gefunden, nutze Defaults.');
+        return DEFAULT_CONFIG;
     }
     try {
         const data = JSON.parse(fs.readFileSync(CONFIG_FILE, 'utf8'));
-        if (!data.cloudProvider) data.cloudProvider = 'gekko';
-        return data;
+        // Merge mit Defaults für neue Felder
+        return { ...DEFAULT_CONFIG, ...data };
     } catch (e) {
-        return { useMock: true, rooms: [], cloudProvider: 'gekko' };
+        console.error('[CONFIG] Fehler beim Lesen der config.json', e);
+        return DEFAULT_CONFIG;
     }
 };
 
@@ -43,9 +48,11 @@ app.get('/api/config', (req, res) => res.json(readConfig()));
 
 app.post('/api/config', (req, res) => {
     try {
+        console.log('[CONFIG] Speichere neue Konfiguration...');
         fs.writeFileSync(CONFIG_FILE, JSON.stringify(req.body, null, 2));
         res.sendStatus(200);
     } catch (err) {
+        console.error('[CONFIG] Fehler beim Speichern:', err.message);
         res.status(500).send(err.message);
     }
 });
@@ -103,5 +110,5 @@ app.use(express.static(__dirname));
 app.get('*', (req, res) => res.sendFile(path.join(__dirname, 'index.html')));
 
 app.listen(PORT, '0.0.0.0', () => {
-    console.log(`TEKKO Server is listening on 0.0.0.0:${PORT}`);
+    console.log(`TEKKO Server running on port ${PORT}`);
 });

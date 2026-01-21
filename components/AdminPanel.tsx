@@ -1,6 +1,6 @@
 
-import React, { useState, useEffect } from 'react';
-import { Save, Plus, Trash2, X, Settings, Shield, RefreshCw, Globe, Wifi, Eye, AlertCircle, CheckCircle2, Terminal, Copy, Server, Activity, Search, Hash, QrCode as QrIcon, Lock, Clock, Download, FileArchive, SlidersHorizontal, Cloud } from 'lucide-react';
+import React, { useState, useEffect, useRef } from 'react';
+import { Save, Plus, Trash2, X, Shield, RefreshCw, Globe, Wifi, CheckCircle2, AlertCircle, Copy, Search, Lock, Clock, Download, SlidersHorizontal } from 'lucide-react';
 import { gekkoService } from '../services/gekkoService.ts';
 import { RoomDefinition, GekkoConfig } from '../types.ts';
 import { QRCodeCanvas } from 'qrcode.react';
@@ -18,6 +18,9 @@ const AdminPanel: React.FC<AdminPanelProps> = ({ onClose, onPreviewRoom }) => {
   const [isDiscovering, setIsDiscovering] = useState(false);
   const [testResult, setTestResult] = useState<{success?: boolean, msg?: string}>({});
   const [isExporting, setIsExporting] = useState(false);
+  
+  // Ref für den versteckten Export-Canvas (High-Res)
+  const exportCanvasRef = useRef<HTMLCanvasElement>(null);
 
   const handleSave = async () => {
     const validatedConfig = {
@@ -28,7 +31,7 @@ const AdminPanel: React.FC<AdminPanelProps> = ({ onClose, onPreviewRoom }) => {
       sessionDurationMinutes: Number(config.sessionDurationMinutes)
     };
     await gekkoService.setConfig(validatedConfig);
-    alert("Einstellungen wurden gespeichert.");
+    alert("Einstellungen wurden permanent gespeichert.");
   };
 
   const copyToClipboard = (text: string) => {
@@ -88,29 +91,73 @@ const AdminPanel: React.FC<AdminPanelProps> = ({ onClose, onPreviewRoom }) => {
     return `${baseUrl}?t=${token}`;
   };
 
+  // Hilfsfunktion zum Generieren eines High-Res Bildes
+  const generateHighResImageData = async (url: string): Promise<string> => {
+    return new Promise((resolve) => {
+      const canvas = document.createElement('canvas');
+      // QRCodeCanvas wird hier nicht direkt genutzt, wir nehmen ein Hilfselement oder lassen qrcode.react rendern
+      // Da wir in React sind, nutzen wir eine temporäre Instanz
+      resolve(""); // Platzhalter für die Logik unten im Export
+    });
+  };
+
   const exportAllQrCodes = async () => {
+    if (config.rooms.length === 0) {
+      alert("Keine Räume zum Exportieren vorhanden.");
+      return;
+    }
+    
     setIsExporting(true);
     try {
       const zip = new JSZip();
-      const canvases = document.querySelectorAll('.qr-export-container canvas');
-      if (canvases.length === 0) {
-        alert("Bitte erst den Export-Tab öffnen.");
-        setIsExporting(false);
-        return;
-      }
-      canvases.forEach((canvas: any, index) => {
-        const roomName = canvas.getAttribute('data-room-name') || `Raum_${index + 1}`;
+      
+      // Wir nutzen ein temporäres Canvas-Element für das High-Res Rendering (1024px)
+      const exportSize = 1024;
+      
+      for (const room of config.rooms) {
+        const url = getQrUrl(room.id);
+        
+        // Wir erzeugen ein verstecktes Canvas für jeden Raum im Export
+        const tempContainer = document.createElement('div');
+        tempContainer.style.display = 'none';
+        document.body.appendChild(tempContainer);
+
+        // Wir nutzen eine kleine Verzögerung um sicherzustellen, dass React den Canvas rendert
+        // Oder wir zeichnen direkt auf einen Canvas falls möglich. 
+        // Einfacher: Wir nutzen die vorhandenen Canvases aber rendern sie beim Klick neu in groß.
+        
+        // Da wir qrcode.react verwenden, ist es am einfachsten, die Daten-URL eines 
+        // temporär erzeugten Canvas-Elements mit hoher Auflösung zu nehmen.
+        
+        const canvas = document.createElement('canvas');
+        const QRCode = (await import('https://esm.sh/qrcode')).default; // Dynamischer Import für Export-Power
+        
+        await QRCode.toCanvas(canvas, url, {
+          width: exportSize,
+          margin: 2,
+          errorCorrectionLevel: 'H',
+          color: {
+            dark: '#00828c',
+            light: '#ffffff'
+          }
+        });
+
         const imageData = canvas.toDataURL("image/png").split(',')[1];
-        zip.file(`${roomName}.png`, imageData, {base64: true});
-      });
+        const fileName = `${room.name.replace(/[/\\?%*:|"<>]/g, '-')}.png`;
+        zip.file(fileName, imageData, {base64: true});
+        
+        document.body.removeChild(tempContainer);
+      }
+      
       const content = await zip.generateAsync({type: "blob"});
-      const url = window.URL.createObjectURL(content);
+      const downloadUrl = window.URL.createObjectURL(content);
       const link = document.createElement('a');
-      link.href = url;
-      link.download = "TEKKO_QR_Codes.zip";
+      link.href = downloadUrl;
+      link.download = `TEKKO_Export_HighRes_${new Date().toISOString().split('T')[0]}.zip`;
       link.click();
-      window.URL.revokeObjectURL(url);
+      window.URL.revokeObjectURL(downloadUrl);
     } catch (error) {
+      console.error("Export Fehler:", error);
       alert("Fehler beim Exportieren.");
     } finally {
       setIsExporting(false);
@@ -229,16 +276,29 @@ const AdminPanel: React.FC<AdminPanelProps> = ({ onClose, onPreviewRoom }) => {
 
         {activeTab === 'export' && (
           <div className="max-w-4xl mx-auto space-y-8">
-            <div className="flex justify-between items-center mb-6">
-              <h3 className="text-sm font-bold uppercase">QR-Codes</h3>
-              <button onClick={exportAllQrCodes} className="bg-[#00828c] text-white px-6 py-2 rounded-lg text-[10px] font-bold uppercase">ZIP Export</button>
+            <div className="flex justify-between items-center mb-6 bg-white p-6 rounded-2xl shadow-sm border border-slate-200">
+              <div>
+                <h3 className="text-sm font-bold uppercase mb-1">QR-Code Export</h3>
+                <p className="text-[10px] text-slate-400">Exporte erfolgen in hoher Auflösung (1024px) für Druckzwecke.</p>
+              </div>
+              <button 
+                onClick={exportAllQrCodes} 
+                disabled={isExporting}
+                className="bg-[#00828c] text-white px-8 py-3 rounded-lg text-[10px] font-bold uppercase shadow-lg hover:bg-[#006a72] transition-all flex items-center gap-2 disabled:opacity-50"
+              >
+                {isExporting ? <RefreshCw className="animate-spin" size={14}/> : <Download size={14}/>} 
+                {isExporting ? 'Generiere ZIP...' : 'ZIP Export (High-Res)'}
+              </button>
             </div>
+            
             <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-6">
                {config.rooms.map(r => (
-                 <div key={r.id} className="bg-white p-6 border rounded-2xl flex flex-col items-center qr-export-container">
-                   <span className="text-xs font-bold mb-4">{r.name}</span>
-                   <QRCodeCanvas value={getQrUrl(r.id)} size={180} level="H" includeMargin={true} {...({"data-room-name": r.name} as any)} />
-                   <button onClick={() => copyToClipboard(getQrUrl(r.id))} className="mt-4 text-[10px] text-[#00828c] uppercase font-bold flex items-center gap-1"><Copy size={12}/> Link</button>
+                 <div key={r.id} className="bg-white p-6 border rounded-2xl flex flex-col items-center group transition-all hover:shadow-md">
+                   <span className="text-[10px] font-bold mb-4 uppercase text-slate-400 group-hover:text-[#00828c]">{r.name}</span>
+                   <div className="p-2 border rounded-lg bg-slate-50">
+                    <QRCodeCanvas value={getQrUrl(r.id)} size={160} level="H" includeMargin={true} />
+                   </div>
+                   <button onClick={() => copyToClipboard(getQrUrl(r.id))} className="mt-4 text-[10px] text-slate-400 uppercase font-bold flex items-center gap-1 hover:text-[#00828c]"><Copy size={12}/> Link kopieren</button>
                  </div>
                ))}
             </div>
@@ -271,7 +331,8 @@ const AdminPanel: React.FC<AdminPanelProps> = ({ onClose, onPreviewRoom }) => {
             </div>
 
             <div className="bg-white p-6 rounded-2xl border shadow-sm">
-               <h3 className="font-bold text-sm mb-4 uppercase flex items-center gap-2"><Lock size={16}/> Sicherheit</h3>
+               <h3 className="font-bold text-sm mb-4 uppercase flex items-center gap-2"><Lock size={16}/> Sicherheitsschlüssel (Token-Verschlüsselung)</h3>
+               <p className="text-[9px] text-slate-400 mb-3">Änderungen hier entwerten alle bisherigen QR-Codes sofort.</p>
                <input type="text" className="admin-input font-mono text-xs" value={config.secretKey} onChange={e => setConfig({...config, secretKey: e.target.value})} />
             </div>
 

@@ -36,15 +36,20 @@ class GekkoService {
       const response = await fetch('/api/config');
       if (response.ok) {
         const loaded = await response.json();
+        // Explizit die lokale Instanz überschreiben
         this.config = { ...this.config, ...loaded };
+        
+        // Sanitizing
         if (!this.config.cloudProvider) this.config.cloudProvider = 'gekko';
         if (this.config.minOffset === undefined) this.config.minOffset = -3.0;
         if (this.config.maxOffset === undefined) this.config.maxOffset = 3.0;
         if (this.config.stepSize === undefined) this.config.stepSize = 0.5;
         if (!this.config.sessionDurationMinutes) this.config.sessionDurationMinutes = 15;
+        
+        console.log('[GEKKO-SERVICE] Konfiguration vom Server geladen. Secret Key aktiv.');
       }
     } catch (e) {
-      console.error("Fehler beim Laden der Server-Config", e);
+      console.error("[GEKKO-SERVICE] Fehler beim Laden der Server-Config", e);
     }
     return this.config;
   }
@@ -56,8 +61,9 @@ class GekkoService {
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify(this.config)
       });
+      console.log('[GEKKO-SERVICE] Konfiguration auf Server gespeichert.');
     } catch (e) {
-      console.error("Fehler beim Speichern auf Server", e);
+      console.error("[GEKKO-SERVICE] Fehler beim Speichern auf Server", e);
     }
   }
 
@@ -82,10 +88,15 @@ class GekkoService {
       while (base64.length % 4 !== 0) base64 += '=';
       const decodedStr = atob(base64);
       const data = JSON.parse(decodedStr);
-      if (data.s && data.s !== this.config.secretKey) return null;
+      
+      // Prüfe ob der secretKey des Tokens mit dem aktuell geladenen übereinstimmt
+      if (data.s && data.s !== this.config.secretKey) {
+        console.warn('[GEKKO-SERVICE] Token Secret Key mismatch. Token ungültig.');
+        return null;
+      }
       return { roomId: data.r };
     } catch (e: any) {
-      console.error('Token Dekodierung fehlgeschlagen', e);
+      console.error('[GEKKO-SERVICE] Token Dekodierung fehlgeschlagen', e);
     }
     return null;
   }
