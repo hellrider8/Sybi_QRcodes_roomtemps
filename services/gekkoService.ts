@@ -23,7 +23,8 @@ class GekkoService {
     sessionDurationMinutes: 15,
     minOffset: -3.0,
     maxOffset: 3.0,
-    stepSize: 0.5
+    stepSize: 0.5,
+    lastUpdated: 0
   };
 
   private currentRoomId: string = '';
@@ -33,20 +34,11 @@ class GekkoService {
 
   async loadConfig(): Promise<GekkoConfig> {
     try {
-      const response = await fetch('/api/config');
+      const response = await fetch('/api/config?t=' + Date.now());
       if (response.ok) {
-        const loaded = await response.json();
-        // Explizit die lokale Instanz überschreiben
-        this.config = { ...this.config, ...loaded };
-        
-        // Sanitizing
-        if (!this.config.cloudProvider) this.config.cloudProvider = 'gekko';
-        if (this.config.minOffset === undefined) this.config.minOffset = -3.0;
-        if (this.config.maxOffset === undefined) this.config.maxOffset = 3.0;
-        if (this.config.stepSize === undefined) this.config.stepSize = 0.5;
-        if (!this.config.sessionDurationMinutes) this.config.sessionDurationMinutes = 15;
-        
-        console.log('[GEKKO-SERVICE] Konfiguration vom Server geladen. Secret Key aktiv.');
+        const serverConfig = await response.json();
+        this.config = { ...this.config, ...serverConfig };
+        console.log(`[GEKKO-SERVICE] Konfiguration geladen (Stand: ${new Date(this.config.lastUpdated || 0).toLocaleTimeString()})`);
       }
     } catch (e) {
       console.error("[GEKKO-SERVICE] Fehler beim Laden der Server-Config", e);
@@ -56,14 +48,19 @@ class GekkoService {
 
   async saveConfig() {
     try {
-      await fetch('/api/config', {
+      const response = await fetch('/api/config', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify(this.config)
       });
-      console.log('[GEKKO-SERVICE] Konfiguration auf Server gespeichert.');
+      if (response.ok) {
+        const updated = await response.json();
+        this.config.lastUpdated = updated.lastUpdated;
+        console.log('[GEKKO-SERVICE] Konfiguration erfolgreich auf Server gespeichert.');
+      }
     } catch (e) {
       console.error("[GEKKO-SERVICE] Fehler beim Speichern auf Server", e);
+      throw e;
     }
   }
 
@@ -89,16 +86,13 @@ class GekkoService {
       const decodedStr = atob(base64);
       const data = JSON.parse(decodedStr);
       
-      // Prüfe ob der secretKey des Tokens mit dem aktuell geladenen übereinstimmt
       if (data.s && data.s !== this.config.secretKey) {
-        console.warn('[GEKKO-SERVICE] Token Secret Key mismatch. Token ungültig.');
         return null;
       }
       return { roomId: data.r };
     } catch (e: any) {
-      console.error('[GEKKO-SERVICE] Token Dekodierung fehlgeschlagen', e);
+      return null;
     }
-    return null;
   }
 
   setCurrentRoom(id: string) {

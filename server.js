@@ -4,10 +4,22 @@ const path = require('path');
 const cors = require('cors');
 const esbuild = require('esbuild');
 const fs = require('fs');
+const admin = require('firebase-admin');
+
+// Firebase Admin initialisieren
+// Im Google Cloud Run Umfeld werden die Credentials automatisch vom Dienstkonto übernommen.
+try {
+    admin.initializeApp();
+    console.log('[FIREBASE] Firebase Admin erfolgreich initialisiert.');
+} catch (e) {
+    console.error('[FIREBASE] Fehler bei der Initialisierung:', e.message);
+}
+
+const db = admin.firestore();
+const configRef = db.collection('tekko_system').doc('globalConfig');
 
 const app = express();
 const PORT = process.env.PORT || 8080;
-const CONFIG_FILE = path.join(__dirname, 'config.json');
 
 app.use(cors());
 app.use(express.json());
@@ -26,37 +38,46 @@ const DEFAULT_CONFIG = {
     minOffset: -3,
     maxOffset: 3,
     stepSize: 0.5,
-    sessionDurationMinutes: 15
+    sessionDurationMinutes: 15,
+    lastUpdated: 0
 };
 
-const readConfig = () => {
-    if (!fs.existsSync(CONFIG_FILE)) {
-        console.log('[CONFIG] Keine config.json gefunden, nutze Defaults.');
-        return DEFAULT_CONFIG;
-    }
+// API: Konfiguration laden
+app.get('/api/config', async (req, res) => {
     try {
-        const data = JSON.parse(fs.readFileSync(CONFIG_FILE, 'utf8'));
-        // Merge mit Defaults für neue Felder
-        return { ...DEFAULT_CONFIG, ...data };
-    } catch (e) {
-        console.error('[CONFIG] Fehler beim Lesen der config.json', e);
-        return DEFAULT_CONFIG;
-    }
-};
-
-app.get('/api/config', (req, res) => res.json(readConfig()));
-
-app.post('/api/config', (req, res) => {
-    try {
-        console.log('[CONFIG] Speichere neue Konfiguration...');
-        fs.writeFileSync(CONFIG_FILE, JSON.stringify(req.body, null, 2));
-        res.sendStatus(200);
+        const doc = await configRef.get();
+        if (!doc.exists) {
+            console.log('[FIRESTORE] Keine Konfiguration gefunden, sende Defaults.');
+            return res.json(DEFAULT_CONFIG);
+        }
+        console.log('[FIRESTORE] Konfiguration geladen.');
+        res.json({ ...DEFAULT_CONFIG, ...doc.data() });
     } catch (err) {
-        console.error('[CONFIG] Fehler beim Speichern:', err.message);
-        res.status(500).send(err.message);
+        console.error('[FIRESTORE-GET-ERROR]', err.message);
+        // Fallback auf Default, falls Firestore noch nicht bereit ist
+        res.json(DEFAULT_CONFIG);
     }
 });
 
+// API: Konfiguration speichern
+app.post('/api/config', async (req, res) => {
+    try {
+        const newConfig = { 
+            ...req.body, 
+            lastUpdated: Date.now() 
+        };
+        
+        console.log(`[FIRESTORE] Speichere Konfiguration (Version: ${newConfig.lastUpdated})...`);
+        await configRef.set(newConfig, { merge: true });
+        
+        res.json(newConfig);
+    } catch (err) {
+        console.error('[FIRESTORE-SAVE-ERROR]', err.message);
+        res.status(500).send('Fehler beim Speichern in Firestore: ' + err.message);
+    }
+});
+
+// Proxy für API-Anfragen an myGEKKO
 app.get('/api/proxy', async (req, res) => {
     const targetUrl = req.query.url;
     if (!targetUrl) return res.status(400).send('Missing url');
@@ -87,6 +108,7 @@ app.get('/api/proxy', async (req, res) => {
     }
 });
 
+// On-the-fly transpilation für TS/TSX
 app.get(['/**/*.tsx', '/**/*.ts', '/*.tsx', '/*.ts'], async (req, res, next) => {
     const filePath = path.join(__dirname, req.path);
     if (fs.existsSync(filePath)) {
@@ -111,4 +133,5 @@ app.get('*', (req, res) => res.sendFile(path.join(__dirname, 'index.html')));
 
 app.listen(PORT, '0.0.0.0', () => {
     console.log(`TEKKO Server running on port ${PORT}`);
+    console.log(`Persistence: Google Cloud Firestore (Collection: tekko_system)`);
 });

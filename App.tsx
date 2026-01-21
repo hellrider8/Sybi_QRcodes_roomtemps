@@ -9,7 +9,8 @@ import AdminPanel from './components/AdminPanel.tsx';
 import { gekkoService } from './services/gekkoService.ts';
 import { GekkoStatus } from './types.ts';
 
-const POLLING_INTERVAL_MS = 10000;
+const STATUS_POLLING_MS = 10000;
+const SYNC_CHECK_MS = 10000; // Prüfe alle 10s auf neue Config am Server
 const SYNC_LOCK_TIMEOUT_MS = 5000; 
 
 const App: React.FC = () => {
@@ -24,8 +25,8 @@ const App: React.FC = () => {
   const [optimisticOffset, setOptimisticOffset] = useState<number | null>(null);
   const lastClickTime = useRef<number>(0);
   const pressTimer = useRef<number | null>(null);
+  const lastConfigTime = useRef<number>(0);
 
-  // Initialisiere mit sicheren Standardwerten
   const [globalSettings, setGlobalSettings] = useState({
     sessionDurationMinutes: 15,
     minOffset: -3.0,
@@ -45,6 +46,7 @@ const App: React.FC = () => {
 
   const loadGlobalConfig = async () => {
     const config = await gekkoService.loadConfig();
+    lastConfigTime.current = config.lastUpdated || 0;
     setGlobalSettings({
       sessionDurationMinutes: Number(config.sessionDurationMinutes) || 15,
       minOffset: config.minOffset !== undefined ? Number(config.minOffset) : -3.0,
@@ -52,87 +54,6 @@ const App: React.FC = () => {
       stepSize: config.stepSize !== undefined ? Number(config.stepSize) : 0.5
     });
   };
-
-  useEffect(() => {
-    const init = async () => {
-      const params = new URLSearchParams(window.location.search);
-      const token = params.get('t');
-      const roomIdDirect = params.get('room');
-
-      await loadGlobalConfig();
-
-      if (window.location.pathname.includes('/admin')) {
-        const pw = prompt("Admin Passwort:");
-        if (pw === "sybtec" || pw === "admin") setShowAdmin(true);
-        else window.location.href = "/";
-        setLoading(false);
-        return;
-      }
-      
-      // Sitzungs-Logik: Ein Token in der URL startet eine neue Sitzung
-      if (token) {
-        const decoded = gekkoService.decodeToken(token);
-        if (decoded) {
-          setCurrentRoomId(decoded.roomId);
-          gekkoService.setCurrentRoom(decoded.roomId);
-          localStorage.setItem('gekko_session_start', Date.now().toString());
-          localStorage.setItem('gekko_current_room', decoded.roomId);
-          window.history.replaceState({}, '', window.location.origin + window.location.pathname + `?room=${decoded.roomId}`);
-          setIsExpired(false);
-        } else {
-          setIsExpired(true);
-          setExpiryReason("Ungültiger QR-Code");
-        }
-      } else if (roomIdDirect) {
-        // Direktzugriff über Lesezeichen prüfen
-        setCurrentRoomId(roomIdDirect);
-        gekkoService.setCurrentRoom(roomIdDirect);
-        // checkExpiry wird im Intervall die fehlende session_start Zeit bemerken
-      } else {
-        const storedRoom = localStorage.getItem('gekko_current_room');
-        if (storedRoom) {
-          setCurrentRoomId(storedRoom);
-          gekkoService.setCurrentRoom(storedRoom);
-        }
-      }
-      setLoading(false);
-    };
-    init();
-  }, []);
-
-  const checkExpiry = useCallback(() => {
-    if (loading || isPreview || showAdmin) return;
-    
-    const startTimeStr = localStorage.getItem('gekko_session_start');
-    
-    // Wenn wir in einem Raum sind, aber keine Startzeit haben -> QR Scan erforderlich
-    if (!startTimeStr && currentRoomId) {
-      if (!isExpired) {
-        setIsExpired(true);
-        setExpiryReason("Bitte QR-Code scannen (Sitzungsschutz)");
-      }
-      return;
-    }
-
-    if (startTimeStr) {
-      const startTime = parseInt(startTimeStr, 10);
-      const durationMs = Number(globalSettings.sessionDurationMinutes) * 60 * 1000;
-      if (Date.now() - startTime > durationMs) {
-        setIsExpired(true);
-        setExpiryReason(`Sitzung abgelaufen (${globalSettings.sessionDurationMinutes} Min.)`);
-      } else {
-        setIsExpired(false);
-      }
-    }
-  }, [currentRoomId, isPreview, showAdmin, loading, isExpired, globalSettings.sessionDurationMinutes]);
-
-  useEffect(() => {
-    if (!loading) {
-      checkExpiry();
-      const timer = setInterval(checkExpiry, 5000);
-      return () => clearInterval(timer);
-    }
-  }, [checkExpiry, loading]);
 
   const refreshData = useCallback(async () => {
     if (loading || isExpired || !currentRoomId || showAdmin) return;
@@ -159,37 +80,126 @@ const App: React.FC = () => {
     } catch (e) {}
   }, [isExpired, loading, currentRoomId, showAdmin, optimisticOffset]);
 
+  // Synchronisierung bei Tab-Focus oder Intervall
+  useEffect(() => {
+    const syncWithServer = async () => {
+      const config = await gekkoService.loadConfig();
+      if (config.lastUpdated && config.lastUpdated > lastConfigTime.current) {
+        console.log('[APP] Neue Konfiguration vom Server erkannt. Synchronisiere...');
+        await loadGlobalConfig();
+        if (currentRoomId) refreshData();
+      }
+    };
+
+    const handleVisibilityChange = () => {
+      if (document.visibilityState === 'visible') {
+        syncWithServer();
+      }
+    };
+
+    document.addEventListener('visibilitychange', handleVisibilityChange);
+    const interval = setInterval(syncWithServer, SYNC_CHECK_MS);
+    
+    return () => {
+      document.removeEventListener('visibilitychange', handleVisibilityChange);
+      clearInterval(interval);
+    };
+  }, [currentRoomId, refreshData]);
+
+  useEffect(() => {
+    const init = async () => {
+      const params = new URLSearchParams(window.location.search);
+      const token = params.get('t');
+      const roomIdDirect = params.get('room');
+
+      await loadGlobalConfig();
+
+      if (window.location.pathname.includes('/admin')) {
+        const pw = prompt("Admin Passwort:");
+        if (pw === "sybtec" || pw === "admin") setShowAdmin(true);
+        else window.location.href = "/";
+        setLoading(false);
+        return;
+      }
+      
+      if (token) {
+        const decoded = gekkoService.decodeToken(token);
+        if (decoded) {
+          setCurrentRoomId(decoded.roomId);
+          gekkoService.setCurrentRoom(decoded.roomId);
+          localStorage.setItem('gekko_session_start', Date.now().toString());
+          localStorage.setItem('gekko_current_room', decoded.roomId);
+          window.history.replaceState({}, '', window.location.origin + window.location.pathname + `?room=${decoded.roomId}`);
+          setIsExpired(false);
+        } else {
+          setIsExpired(true);
+          setExpiryReason("Ungültiger QR-Code");
+        }
+      } else if (roomIdDirect) {
+        setCurrentRoomId(roomIdDirect);
+        gekkoService.setCurrentRoom(roomIdDirect);
+      } else {
+        const storedRoom = localStorage.getItem('gekko_current_room');
+        if (storedRoom) {
+          setCurrentRoomId(storedRoom);
+          gekkoService.setCurrentRoom(storedRoom);
+        }
+      }
+      setLoading(false);
+    };
+    init();
+  }, []);
+
+  const checkExpiry = useCallback(() => {
+    if (loading || isPreview || showAdmin) return;
+    const startTimeStr = localStorage.getItem('gekko_session_start');
+    if (!startTimeStr && currentRoomId) {
+      if (!isExpired) {
+        setIsExpired(true);
+        setExpiryReason("Bitte QR-Code scannen");
+      }
+      return;
+    }
+    if (startTimeStr) {
+      const startTime = parseInt(startTimeStr, 10);
+      const durationMs = Number(globalSettings.sessionDurationMinutes) * 60 * 1000;
+      if (Date.now() - startTime > durationMs) {
+        setIsExpired(true);
+        setExpiryReason(`Sitzung abgelaufen`);
+      } else {
+        setIsExpired(false);
+      }
+    }
+  }, [currentRoomId, isPreview, showAdmin, loading, isExpired, globalSettings.sessionDurationMinutes]);
+
+  useEffect(() => {
+    if (!loading) {
+      checkExpiry();
+      const timer = setInterval(checkExpiry, 5000);
+      return () => clearInterval(timer);
+    }
+  }, [checkExpiry, loading]);
+
   useEffect(() => {
     if (!loading && currentRoomId && !showAdmin && !isExpired) {
       refreshData();
-      const interval = setInterval(refreshData, POLLING_INTERVAL_MS);
+      const interval = setInterval(refreshData, STATUS_POLLING_MS);
       return () => clearInterval(interval);
     }
   }, [refreshData, currentRoomId, showAdmin, loading, isExpired]);
 
   const handleTempAdjust = async (delta: number) => {
     if (!status || isExpired || !currentRoomId) return;
-    
-    // Basiswert bestimmen und strikt als Number behandeln
     const baseOffset = optimisticOffset !== null ? optimisticOffset : Number(status.offset);
     let nextOffset = Number((baseOffset + delta).toFixed(2));
-    
     const min = Number(globalSettings.minOffset);
     const max = Number(globalSettings.maxOffset);
-
-    // Strikte Grenzwertprüfung
     if (nextOffset > max) nextOffset = max;
     if (nextOffset < min) nextOffset = min;
-
-    // Wenn keine Änderung möglich (Limit erreicht)
-    if (Math.abs(nextOffset - baseOffset) < 0.01) {
-      console.log("Limit erreicht:", nextOffset);
-      return; 
-    }
+    if (Math.abs(nextOffset - baseOffset) < 0.01) return; 
 
     lastClickTime.current = Date.now();
     setOptimisticOffset(nextOffset);
-    
     setStatus(prev => prev ? {
       ...prev,
       offset: nextOffset,
@@ -215,9 +225,7 @@ const App: React.FC = () => {
   };
 
   if (loading) return <div className="min-h-screen flex items-center justify-center bg-[#e0e4e7]"><div className="w-10 h-10 border-4 border-[#00828c] border-t-transparent rounded-full animate-spin"></div></div>;
-
   if (showAdmin) return <AdminPanel onClose={async () => { await loadGlobalConfig(); setShowAdmin(false); }} onPreviewRoom={(id) => { setIsPreview(true); setCurrentRoomId(id); gekkoService.setCurrentRoom(id); setShowAdmin(false); }} />;
-
   if (!currentRoomId || isExpired) return <div className="min-h-screen max-w-md mx-auto bg-[#00828c] relative"><ExpiredScreen reason={expiryReason} sessionMinutes={globalSettings.sessionDurationMinutes} /><div className="absolute top-0 w-full h-32 z-[60]" onMouseDown={handleAdminStart} onMouseUp={handleAdminEnd} onTouchStart={handleAdminStart} onTouchEnd={handleAdminEnd} /></div>;
 
   return (

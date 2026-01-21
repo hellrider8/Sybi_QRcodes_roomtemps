@@ -22,6 +22,8 @@ export interface GekkoConfig {
   minOffset: number; 
   maxOffset: number; 
   stepSize: number;  
+  // The timestamp (in milliseconds) of when the configuration was last updated on the server.
+  lastUpdated: number;
 }
 
 export interface GekkoStatus {

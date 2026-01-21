@@ -18,20 +18,27 @@ const AdminPanel: React.FC<AdminPanelProps> = ({ onClose, onPreviewRoom }) => {
   const [isDiscovering, setIsDiscovering] = useState(false);
   const [testResult, setTestResult] = useState<{success?: boolean, msg?: string}>({});
   const [isExporting, setIsExporting] = useState(false);
-  
-  // Ref für den versteckten Export-Canvas (High-Res)
-  const exportCanvasRef = useRef<HTMLCanvasElement>(null);
+  const [isSaving, setIsSaving] = useState(false);
 
   const handleSave = async () => {
-    const validatedConfig = {
-      ...config,
-      minOffset: Number(config.minOffset),
-      maxOffset: Number(config.maxOffset),
-      stepSize: Number(config.stepSize),
-      sessionDurationMinutes: Number(config.sessionDurationMinutes)
-    };
-    await gekkoService.setConfig(validatedConfig);
-    alert("Einstellungen wurden permanent gespeichert.");
+    setIsSaving(true);
+    try {
+      const validatedConfig = {
+        ...config,
+        minOffset: Number(config.minOffset),
+        maxOffset: Number(config.maxOffset),
+        stepSize: Number(config.stepSize),
+        sessionDurationMinutes: Number(config.sessionDurationMinutes)
+      };
+      await gekkoService.setConfig(validatedConfig);
+      const updated = gekkoService.getConfig();
+      setConfig(updated);
+      alert("Einstellungen wurden permanent auf dem Server gespeichert.");
+    } catch (e) {
+      alert("Speichern fehlgeschlagen.");
+    } finally {
+      setIsSaving(false);
+    }
   };
 
   const copyToClipboard = (text: string) => {
@@ -50,7 +57,7 @@ const AdminPanel: React.FC<AdminPanelProps> = ({ onClose, onPreviewRoom }) => {
 
   const testConnection = async () => {
     setIsTesting(true);
-    await gekkoService.setConfig(config);
+    // Wir speichern nicht permanent, sondern setzen nur temporär für den Test
     const res = await gekkoService.testConnection();
     setTestResult({ success: res.success, msg: res.message });
     setIsTesting(false);
@@ -58,7 +65,6 @@ const AdminPanel: React.FC<AdminPanelProps> = ({ onClose, onPreviewRoom }) => {
 
   const handleDiscover = async () => {
     setIsDiscovering(true);
-    await gekkoService.setConfig(config);
     try {
       const result = await gekkoService.discoverRooms();
       if (result.rooms && result.rooms.length > 0) {
@@ -91,16 +97,6 @@ const AdminPanel: React.FC<AdminPanelProps> = ({ onClose, onPreviewRoom }) => {
     return `${baseUrl}?t=${token}`;
   };
 
-  // Hilfsfunktion zum Generieren eines High-Res Bildes
-  const generateHighResImageData = async (url: string): Promise<string> => {
-    return new Promise((resolve) => {
-      const canvas = document.createElement('canvas');
-      // QRCodeCanvas wird hier nicht direkt genutzt, wir nehmen ein Hilfselement oder lassen qrcode.react rendern
-      // Da wir in React sind, nutzen wir eine temporäre Instanz
-      resolve(""); // Platzhalter für die Logik unten im Export
-    });
-  };
-
   const exportAllQrCodes = async () => {
     if (config.rooms.length === 0) {
       alert("Keine Räume zum Exportieren vorhanden.");
@@ -110,43 +106,23 @@ const AdminPanel: React.FC<AdminPanelProps> = ({ onClose, onPreviewRoom }) => {
     setIsExporting(true);
     try {
       const zip = new JSZip();
-      
-      // Wir nutzen ein temporäres Canvas-Element für das High-Res Rendering (1024px)
       const exportSize = 1024;
       
       for (const room of config.rooms) {
         const url = getQrUrl(room.id);
-        
-        // Wir erzeugen ein verstecktes Canvas für jeden Raum im Export
-        const tempContainer = document.createElement('div');
-        tempContainer.style.display = 'none';
-        document.body.appendChild(tempContainer);
-
-        // Wir nutzen eine kleine Verzögerung um sicherzustellen, dass React den Canvas rendert
-        // Oder wir zeichnen direkt auf einen Canvas falls möglich. 
-        // Einfacher: Wir nutzen die vorhandenen Canvases aber rendern sie beim Klick neu in groß.
-        
-        // Da wir qrcode.react verwenden, ist es am einfachsten, die Daten-URL eines 
-        // temporär erzeugten Canvas-Elements mit hoher Auflösung zu nehmen.
-        
         const canvas = document.createElement('canvas');
-        const QRCode = (await import('https://esm.sh/qrcode')).default; // Dynamischer Import für Export-Power
+        const QRCode = (await import('https://esm.sh/qrcode')).default;
         
         await QRCode.toCanvas(canvas, url, {
           width: exportSize,
           margin: 2,
           errorCorrectionLevel: 'H',
-          color: {
-            dark: '#00828c',
-            light: '#ffffff'
-          }
+          color: { dark: '#00828c', light: '#ffffff' }
         });
 
         const imageData = canvas.toDataURL("image/png").split(',')[1];
         const fileName = `${room.name.replace(/[/\\?%*:|"<>]/g, '-')}.png`;
         zip.file(fileName, imageData, {base64: true});
-        
-        document.body.removeChild(tempContainer);
       }
       
       const content = await zip.generateAsync({type: "blob"});
@@ -157,7 +133,6 @@ const AdminPanel: React.FC<AdminPanelProps> = ({ onClose, onPreviewRoom }) => {
       link.click();
       window.URL.revokeObjectURL(downloadUrl);
     } catch (error) {
-      console.error("Export Fehler:", error);
       alert("Fehler beim Exportieren.");
     } finally {
       setIsExporting(false);
@@ -171,7 +146,14 @@ const AdminPanel: React.FC<AdminPanelProps> = ({ onClose, onPreviewRoom }) => {
           <Shield size={20} />
           <h2 className="text-lg font-bold uppercase tracking-tight">System Backend</h2>
         </div>
-        <button onClick={onClose} className="p-2 hover:bg-black/10 rounded-full transition-colors"><X size={24} /></button>
+        <div className="flex items-center gap-4">
+          {config.lastUpdated > 0 && (
+            <span className="text-[9px] opacity-60 uppercase font-bold hidden sm:inline">
+              Stand: {new Date(config.lastUpdated).toLocaleTimeString()}
+            </span>
+          )}
+          <button onClick={onClose} className="p-2 hover:bg-black/10 rounded-full transition-colors"><X size={24} /></button>
+        </div>
       </div>
 
       <div className="flex bg-slate-100 border-b overflow-x-auto scrollbar-hide">
@@ -216,13 +198,13 @@ const AdminPanel: React.FC<AdminPanelProps> = ({ onClose, onPreviewRoom }) => {
                   <div className="flex p-1 bg-slate-100 rounded-lg border border-slate-200">
                     <button 
                       onClick={() => setConfig({...config, cloudProvider: 'gekko'})} 
-                      className={`flex-1 py-2 rounded text-[10px] font-bold flex items-center justify-center gap-2 transition-all ${config.cloudProvider === 'gekko' ? 'bg-[#00828c] text-white shadow-sm' : 'text-slate-500'}`}
+                      className={`flex-1 py-2 rounded text-[10px] font-bold transition-all ${config.cloudProvider === 'gekko' ? 'bg-[#00828c] text-white shadow-sm' : 'text-slate-500'}`}
                     >
                       myGEKKO
                     </button>
                     <button 
                       onClick={() => setConfig({...config, cloudProvider: 'tekko'})} 
-                      className={`flex-1 py-2 rounded text-[10px] font-bold flex items-center justify-center gap-2 transition-all ${config.cloudProvider === 'tekko' ? 'bg-[#00828c] text-white shadow-sm' : 'text-slate-500'}`}
+                      className={`flex-1 py-2 rounded text-[10px] font-bold transition-all ${config.cloudProvider === 'tekko' ? 'bg-[#00828c] text-white shadow-sm' : 'text-slate-500'}`}
                     >
                       TEKKO
                     </button>
@@ -279,7 +261,7 @@ const AdminPanel: React.FC<AdminPanelProps> = ({ onClose, onPreviewRoom }) => {
             <div className="flex justify-between items-center mb-6 bg-white p-6 rounded-2xl shadow-sm border border-slate-200">
               <div>
                 <h3 className="text-sm font-bold uppercase mb-1">QR-Code Export</h3>
-                <p className="text-[10px] text-slate-400">Exporte erfolgen in hoher Auflösung (1024px) für Druckzwecke.</p>
+                <p className="text-[10px] text-slate-400">Hochauflösend (1024px).</p>
               </div>
               <button 
                 onClick={exportAllQrCodes} 
@@ -287,7 +269,7 @@ const AdminPanel: React.FC<AdminPanelProps> = ({ onClose, onPreviewRoom }) => {
                 className="bg-[#00828c] text-white px-8 py-3 rounded-lg text-[10px] font-bold uppercase shadow-lg hover:bg-[#006a72] transition-all flex items-center gap-2 disabled:opacity-50"
               >
                 {isExporting ? <RefreshCw className="animate-spin" size={14}/> : <Download size={14}/>} 
-                {isExporting ? 'Generiere ZIP...' : 'ZIP Export (High-Res)'}
+                {isExporting ? 'Generiere ZIP...' : 'ZIP Export'}
               </button>
             </div>
             
@@ -311,16 +293,10 @@ const AdminPanel: React.FC<AdminPanelProps> = ({ onClose, onPreviewRoom }) => {
                <h3 className="font-bold text-sm mb-4 uppercase flex items-center gap-2 text-[#00828c]"><SlidersHorizontal size={16}/> Regelungsparameter</h3>
                <div className="space-y-4">
                  <div>
-                   <label className="text-[9px] font-bold uppercase text-slate-400 block mb-1">Anpassungsbereich (Min / Max)</label>
+                   <label className="text-[9px] font-bold uppercase text-slate-400 block mb-1">Bereich (Min / Max)</label>
                    <div className="grid grid-cols-2 gap-3">
-                     <div className="relative">
-                       <span className="absolute left-3 top-2.5 text-slate-400 text-xs">MIN</span>
-                       <input type="number" step="0.1" className="admin-input pl-12 text-center" value={config.minOffset} onChange={e => setConfig({...config, minOffset: Number(e.target.value)})} />
-                     </div>
-                     <div className="relative">
-                       <span className="absolute left-3 top-2.5 text-slate-400 text-xs">MAX</span>
-                       <input type="number" step="0.1" className="admin-input pl-12 text-center" value={config.maxOffset} onChange={e => setConfig({...config, maxOffset: Number(e.target.value)})} />
-                     </div>
+                     <input type="number" step="0.1" className="admin-input text-center" value={config.minOffset} onChange={e => setConfig({...config, minOffset: Number(e.target.value)})} />
+                     <input type="number" step="0.1" className="admin-input text-center" value={config.maxOffset} onChange={e => setConfig({...config, maxOffset: Number(e.target.value)})} />
                    </div>
                  </div>
                  <div>
@@ -331,13 +307,12 @@ const AdminPanel: React.FC<AdminPanelProps> = ({ onClose, onPreviewRoom }) => {
             </div>
 
             <div className="bg-white p-6 rounded-2xl border shadow-sm">
-               <h3 className="font-bold text-sm mb-4 uppercase flex items-center gap-2"><Lock size={16}/> Sicherheitsschlüssel (Token-Verschlüsselung)</h3>
-               <p className="text-[9px] text-slate-400 mb-3">Änderungen hier entwerten alle bisherigen QR-Codes sofort.</p>
+               <h3 className="font-bold text-sm mb-4 uppercase flex items-center gap-2"><Lock size={16}/> Sicherheitsschlüssel</h3>
                <input type="text" className="admin-input font-mono text-xs" value={config.secretKey} onChange={e => setConfig({...config, secretKey: e.target.value})} />
             </div>
 
             <div className="bg-white p-6 rounded-2xl border shadow-sm">
-               <h3 className="font-bold text-sm mb-4 uppercase flex items-center gap-2"><Clock size={16}/> Sitzungsdauer (Minuten)</h3>
+               <h3 className="font-bold text-sm mb-4 uppercase flex items-center gap-2"><Clock size={16}/> Sitzungsdauer (Min.)</h3>
                <input type="number" className="admin-input w-24 text-center font-bold" value={config.sessionDurationMinutes} onChange={e => setConfig({...config, sessionDurationMinutes: Number(e.target.value)})} min="1" />
             </div>
           </div>
@@ -346,7 +321,14 @@ const AdminPanel: React.FC<AdminPanelProps> = ({ onClose, onPreviewRoom }) => {
 
       <div className="p-4 sm:p-6 border-t flex justify-end gap-3 bg-white">
         <button onClick={onClose} className="px-6 py-2.5 text-xs font-bold text-slate-400 uppercase">Abbrechen</button>
-        <button onClick={handleSave} className="px-10 py-2.5 bg-[#00828c] text-white rounded-lg text-xs font-bold uppercase shadow-lg hover:bg-[#006a72] transition-all">Speichern</button>
+        <button 
+          onClick={handleSave} 
+          disabled={isSaving}
+          className="px-10 py-2.5 bg-[#00828c] text-white rounded-lg text-xs font-bold uppercase shadow-lg hover:bg-[#006a72] transition-all disabled:opacity-50 flex items-center gap-2"
+        >
+          {isSaving && <RefreshCw className="animate-spin" size={14}/>}
+          {isSaving ? 'Speichere...' : 'Speichern'}
+        </button>
       </div>
     </div>
   );
