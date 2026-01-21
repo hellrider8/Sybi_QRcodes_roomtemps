@@ -95,6 +95,7 @@ class GekkoService {
   private getUrl(path: string, customQuery: string = '') {
     let baseUrl = '';
     let authParams = '';
+    
     if (this.config.apiMode === 'cloud') {
       const host = this.config.cloudProvider === 'tekko' ? 'eu1.tekko.cloud' : 'live.my-gekko.com';
       baseUrl = `https://${host}/api/v1/var`;
@@ -102,6 +103,7 @@ class GekkoService {
     } else {
       baseUrl = `http://${this.config.ip}/api/v1/var`;
     }
+    
     const cleanPath = path.startsWith('/') ? path : `/${path}`;
     let finalUrl = `${baseUrl}${cleanPath}`;
     const queryParts: string[] = [];
@@ -128,7 +130,7 @@ class GekkoService {
     try {
       const response = await fetch(url, this.getFetchOptions());
       if (response.ok) return { success: true, message: "Verbindung steht!" };
-      return { success: false, message: `Fehler: ${response.status}` };
+      return { success: false, message: `Fehler: HTTP ${response.status}` };
     } catch (e) { return { success: false, message: "Nicht erreichbar" }; }
   }
 
@@ -148,16 +150,14 @@ class GekkoService {
       const rawData = await response.json();
       const items = rawData.roomtemps || rawData;
       const rooms: RoomDefinition[] = [];
+      
       const processItem = (id: string, item: any) => {
         if (!item || typeof item !== 'object') return;
         const name = item.name || id;
         const stringId = String(id);
         
-        // STRIKTE FILTERUNG VON GRUPPEN (Sowohl ID als auch Name prüfen)
-        if (name.toUpperCase().includes('GROUP') || stringId.toUpperCase().includes('GROUP')) {
-          console.log(`[GEKKO-FILTER] Ignoriere Gruppe: ID=${stringId}, Name=${name}`);
-          return;
-        }
+        // FILTER: Ignoriere alles mit GROUP in Name oder ID
+        if (name.toUpperCase().includes('GROUP') || stringId.toUpperCase().includes('GROUP')) return;
         
         rooms.push({ id: stringId, name, category: item.page || "RÄUME", enabled: true });
       };
