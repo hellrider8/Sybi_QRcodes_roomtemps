@@ -1,3 +1,4 @@
+
 const express = require('express');
 const path = require('path');
 const cors = require('cors');
@@ -9,27 +10,21 @@ const { getFirestore } = require('firebase-admin/firestore');
 const app = express();
 const PORT = process.env.PORT || 8080;
 
-// Firebase Admin sicher initialisieren
 try {
     if (!admin.apps.length) {
         admin.initializeApp();
-        console.log('[FIREBASE] Admin SDK initialisiert.');
     }
 } catch (e) {
-    console.error('[FIREBASE] Initialisierungsfehler:', e.message);
+    console.error('[FIREBASE] Error:', e.message);
 }
 
-// Datenbank-ID explizit auf 'tekkoconfig' setzen
 let db;
 let configRef;
 
 try {
     db = getFirestore('tekkoconfig');
     configRef = db.collection('configs').doc('global');
-    console.log('[FIRESTORE] Datenbank "tekkoconfig" erfolgreich verbunden.');
 } catch (e) {
-    console.error('[FIRESTORE] Fehler beim Zugriff auf "tekkoconfig":', e.message);
-    // Fallback auf Default, falls tekkoconfig nicht erreichbar
     db = admin.firestore();
     configRef = db.collection('configs').doc('global');
 }
@@ -37,7 +32,6 @@ try {
 app.use(cors());
 app.use(express.json({ limit: '1mb' }));
 
-// Hilfsfunktion: Entfernt alle 'undefined' Werte
 function sanitize(obj) {
   if (Array.isArray(obj)) {
     return obj.map(v => sanitize(v));
@@ -61,8 +55,8 @@ const DEFAULT_CONFIG = {
     useMock: true,
     secretKey: 'sybtec-static-access-key-2024',
     rooms: [],
-    minOffset: -3,
-    maxOffset: 3,
+    minOffset: -3.0,
+    maxOffset: 3.0,
     stepSize: 0.5,
     sessionDurationMinutes: 15,
     lastUpdated: 0
@@ -85,7 +79,7 @@ app.post('/api/config', async (req, res) => {
         await configRef.set(newConfig, { merge: true });
         res.json(newConfig);
     } catch (err) {
-        res.status(500).json({ error: 'Datenbank-Fehler', details: err.message });
+        res.status(500).json({ error: 'DB Error', details: err.message });
     }
 });
 
@@ -125,5 +119,5 @@ app.use(express.static(__dirname));
 app.get('*', (req, res) => res.sendFile(path.join(__dirname, 'index.html')));
 
 app.listen(PORT, '0.0.0.0', () => {
-    console.log(`Server läuft auf Port ${PORT}`);
+    console.log(`Server running on port ${PORT}`);
 });

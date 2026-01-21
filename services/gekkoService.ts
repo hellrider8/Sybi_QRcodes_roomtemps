@@ -64,7 +64,6 @@ class GekkoService {
       
       const result = await response.json();
       this.config.lastUpdated = result.lastUpdated;
-      console.log('[GEKKO-SERVICE] Gespeichert.');
     } catch (e: any) {
       console.error("[GEKKO-SERVICE] Save Error", e);
       throw e;
@@ -165,29 +164,28 @@ class GekkoService {
       const items = rawData.roomtemps || rawData;
       const rooms: RoomDefinition[] = [];
       
+      const processItem = (id: string, item: any) => {
+        if (!item || typeof item !== 'object') return;
+        const name = item.name || id;
+        // Filtert alle Elemente aus, die "GROUP" im Namen enthalten
+        if (name.toUpperCase().includes('GROUP')) return;
+        
+        rooms.push({ 
+          id: String(id), 
+          name: name, 
+          category: item.page || "RÄUME", 
+          enabled: true 
+        });
+      };
+
       if (Array.isArray(items)) {
         items.forEach((item: any) => {
-          if (item && item.id) {
-            rooms.push({ 
-              id: String(item.id), 
-              name: item.name || String(item.id), 
-              category: item.page || "RÄUME", 
-              enabled: true 
-            });
-          }
+          if (item && item.id) processItem(item.id, item);
         });
       } else if (typeof items === 'object' && items !== null) {
         for (const key in items) {
           if (key.startsWith('_')) continue;
-          const item = items[key];
-          if (typeof item === 'object' && item !== null) {
-            rooms.push({ 
-              id: key, 
-              name: item.name || key, 
-              category: item.page || "RÄUME", 
-              enabled: true 
-            });
-          }
+          processItem(key, items[key]);
         }
       }
 
