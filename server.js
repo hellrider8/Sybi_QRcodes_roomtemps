@@ -1,3 +1,4 @@
+
 const express = require('express');
 const path = require('path');
 const cors = require('cors');
@@ -5,7 +6,6 @@ const esbuild = require('esbuild');
 const fs = require('fs');
 
 const app = express();
-// Cloud Run setzt die Umgebungsvariable PORT (meist 8080)
 const PORT = process.env.PORT || 8080;
 const CONFIG_FILE = path.join(__dirname, 'config.json');
 
@@ -16,6 +16,7 @@ const readConfig = () => {
     if (!fs.existsSync(CONFIG_FILE)) {
         return {
             apiMode: 'local',
+            cloudProvider: 'gekko',
             ip: '',
             gekkoId: '',
             username: '',
@@ -30,9 +31,11 @@ const readConfig = () => {
         };
     }
     try {
-        return JSON.parse(fs.readFileSync(CONFIG_FILE, 'utf8'));
+        const data = JSON.parse(fs.readFileSync(CONFIG_FILE, 'utf8'));
+        if (!data.cloudProvider) data.cloudProvider = 'gekko';
+        return data;
     } catch (e) {
-        return { useMock: true, rooms: [] };
+        return { useMock: true, rooms: [], cloudProvider: 'gekko' };
     }
 };
 
@@ -99,7 +102,6 @@ app.use(express.static(__dirname));
 
 app.get('*', (req, res) => res.sendFile(path.join(__dirname, 'index.html')));
 
-// Cloud Run erfordert das Binden an 0.0.0.0
 app.listen(PORT, '0.0.0.0', () => {
     console.log(`TEKKO Server is listening on 0.0.0.0:${PORT}`);
 });

@@ -1,6 +1,6 @@
 
 import React, { useState, useEffect } from 'react';
-import { Save, Plus, Trash2, X, Settings, Shield, RefreshCw, Globe, Wifi, Eye, AlertCircle, CheckCircle2, Terminal, Copy, Server, Activity, Search, Hash, QrCode as QrIcon, Lock, Clock, Download, FileArchive, SlidersHorizontal } from 'lucide-react';
+import { Save, Plus, Trash2, X, Settings, Shield, RefreshCw, Globe, Wifi, Eye, AlertCircle, CheckCircle2, Terminal, Copy, Server, Activity, Search, Hash, QrCode as QrIcon, Lock, Clock, Download, FileArchive, SlidersHorizontal, Cloud } from 'lucide-react';
 import { gekkoService } from '../services/gekkoService.ts';
 import { RoomDefinition, GekkoConfig } from '../types.ts';
 import { QRCodeCanvas } from 'qrcode.react';
@@ -20,7 +20,6 @@ const AdminPanel: React.FC<AdminPanelProps> = ({ onClose, onPreviewRoom }) => {
   const [isExporting, setIsExporting] = useState(false);
 
   const handleSave = async () => {
-    // Validierung und Casting vor dem Speichern
     const validatedConfig = {
       ...config,
       minOffset: Number(config.minOffset),
@@ -164,10 +163,35 @@ const AdminPanel: React.FC<AdminPanelProps> = ({ onClose, onPreviewRoom }) => {
                 <button onClick={() => setConfig({...config, apiMode: 'cloud'})} className={`flex-1 py-2 rounded text-[10px] font-bold ${config.apiMode === 'cloud' ? 'bg-white text-[#00828c]' : 'text-slate-500'}`}>CLOUD (LiveID)</button>
               </div>
 
-              <input type="text" placeholder={config.apiMode === 'local' ? "IP (z.B. 10.10.10.50)" : "Live-ID"} className="admin-input" value={config.apiMode === 'local' ? config.ip : config.gekkoId} onChange={e => setConfig(config.apiMode === 'local' ? {...config, ip: e.target.value} : {...config, gekkoId: e.target.value})} />
-              <div className="grid grid-cols-2 gap-3">
-                <input type="text" placeholder="Benutzer" className="admin-input" value={config.username} onChange={e => setConfig({...config, username: e.target.value})} />
-                <input type="password" placeholder="Passwort" className="admin-input" value={config.password} onChange={e => setConfig({...config, password: e.target.value})} />
+              {config.apiMode === 'cloud' && (
+                <div className="space-y-2">
+                  <label className="text-[9px] font-bold uppercase text-slate-400 block ml-1">Cloud Provider</label>
+                  <div className="flex p-1 bg-slate-100 rounded-lg border border-slate-200">
+                    <button 
+                      onClick={() => setConfig({...config, cloudProvider: 'gekko'})} 
+                      className={`flex-1 py-2 rounded text-[10px] font-bold flex items-center justify-center gap-2 transition-all ${config.cloudProvider === 'gekko' ? 'bg-[#00828c] text-white shadow-sm' : 'text-slate-500'}`}
+                    >
+                      myGEKKO
+                    </button>
+                    <button 
+                      onClick={() => setConfig({...config, cloudProvider: 'tekko'})} 
+                      className={`flex-1 py-2 rounded text-[10px] font-bold flex items-center justify-center gap-2 transition-all ${config.cloudProvider === 'tekko' ? 'bg-[#00828c] text-white shadow-sm' : 'text-slate-500'}`}
+                    >
+                      TEKKO
+                    </button>
+                  </div>
+                </div>
+              )}
+
+              <div className="space-y-4">
+                <div className="relative">
+                  <span className="absolute left-3 top-2.5 text-slate-400"><Globe size={14}/></span>
+                  <input type="text" placeholder={config.apiMode === 'local' ? "IP (z.B. 10.10.10.50)" : "Live-ID / Gekko-ID"} className="admin-input pl-10" value={config.apiMode === 'local' ? config.ip : config.gekkoId} onChange={e => setConfig(config.apiMode === 'local' ? {...config, ip: e.target.value} : {...config, gekkoId: e.target.value})} />
+                </div>
+                <div className="grid grid-cols-2 gap-3">
+                  <input type="text" placeholder="Benutzer" className="admin-input" value={config.username} onChange={e => setConfig({...config, username: e.target.value})} />
+                  <input type="password" placeholder="Passwort / Key" className="admin-input" value={config.password} onChange={e => setConfig({...config, password: e.target.value})} />
+                </div>
               </div>
 
               <button onClick={testConnection} disabled={isTesting} className="w-full py-3 bg-slate-900 text-white rounded-lg text-xs font-bold flex items-center justify-center gap-2">

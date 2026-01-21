@@ -8,6 +8,7 @@ export interface RoomDefinition {
 
 export interface GekkoConfig {
   apiMode: 'local' | 'cloud';
+  cloudProvider: 'gekko' | 'tekko';
   ip: string;
   gekkoId: string; 
   username: string;

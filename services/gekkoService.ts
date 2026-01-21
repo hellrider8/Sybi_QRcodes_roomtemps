@@ -11,6 +11,7 @@ export interface DiscoveryResult {
 class GekkoService {
   private config: GekkoConfig = {
     apiMode: 'local',
+    cloudProvider: 'gekko',
     ip: '',
     gekkoId: '',
     username: '',
@@ -36,6 +37,7 @@ class GekkoService {
       if (response.ok) {
         const loaded = await response.json();
         this.config = { ...this.config, ...loaded };
+        if (!this.config.cloudProvider) this.config.cloudProvider = 'gekko';
         if (this.config.minOffset === undefined) this.config.minOffset = -3.0;
         if (this.config.maxOffset === undefined) this.config.maxOffset = 3.0;
         if (this.config.stepSize === undefined) this.config.stepSize = 0.5;
@@ -95,12 +97,15 @@ class GekkoService {
   private getUrl(path: string, customQuery: string = '') {
     let baseUrl = '';
     let authParams = '';
+    
     if (this.config.apiMode === 'cloud') {
-      baseUrl = `https://live.my-gekko.com/api/v1/var`;
+      const host = this.config.cloudProvider === 'tekko' ? 'eu1.tekko.cloud' : 'live.my-gekko.com';
+      baseUrl = `https://${host}/api/v1/var`;
       authParams = `username=${encodeURIComponent(this.config.username)}&key=${encodeURIComponent(this.config.password)}&gekkoid=${encodeURIComponent(this.config.gekkoId)}`;
     } else {
       baseUrl = `http://${this.config.ip}/api/v1/var`;
     }
+    
     const cleanPath = path.startsWith('/') ? path : `/${path}`;
     let finalUrl = `${baseUrl}${cleanPath}`;
     const queryParts: string[] = [];
@@ -172,7 +177,6 @@ class GekkoService {
       };
     }
 
-    // Bulk-Endpunkt nutzen
     const url = this.getUrl('/roomtemps/status');
     const response = await fetch(url, this.getFetchOptions());
     if (!response.ok) throw new Error(`HTTP Error ${response.status}`);
