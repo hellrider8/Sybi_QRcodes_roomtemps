@@ -40,7 +40,7 @@ const App: React.FC = () => {
       sessionDurationMinutes: Number(config.sessionDurationMinutes) || 15,
       minOffset: config.minOffset !== undefined ? Number(config.minOffset) : -3.0,
       maxOffset: config.maxOffset !== undefined ? Number(config.maxOffset) : 3.0,
-      stepSize: 0.5 // Immer fest auf 0.5 für dieses Projekt
+      stepSize: config.stepSize !== undefined ? Number(config.stepSize) : 0.5
     });
   };
 
@@ -52,7 +52,7 @@ const App: React.FC = () => {
       const isLocked = (now - lastClickTime.current) < SYNC_LOCK_TIMEOUT_MS;
 
       if (isLocked && optimisticOffset !== null) {
-        if (Math.abs(Number(fresh.offset) - optimisticOffset) < 0.01) {
+        if (Math.abs(Number(fresh.offset) - optimisticOffset) < 0.001) {
           setOptimisticOffset(null);
           setStatus(fresh);
         } else {
@@ -88,7 +88,7 @@ const App: React.FC = () => {
           setIsExpired(false);
         } else {
           setIsExpired(true);
-          setExpiryReason("Code ungültig");
+          setExpiryReason("Token ungültig");
         }
       } else if (roomIdDirect) {
         setCurrentRoomId(roomIdDirect);
@@ -103,9 +103,10 @@ const App: React.FC = () => {
     if (!status || isExpired || !currentRoomId) return;
     
     const baseOffset = optimisticOffset !== null ? optimisticOffset : Number(status.offset);
-    // Erzwungene Rundung auf 0.5er Schritte
-    const step = 0.5;
-    let nextOffset = Math.round((baseOffset + delta) * 2) / 2;
+    const step = Number(globalSettings.stepSize) || 0.5;
+    
+    // Dynamische Berechnung basierend auf der Schrittweite aus dem Backend
+    let nextOffset = Math.round((baseOffset + delta) / step) * step;
     
     const min = Number(globalSettings.minOffset);
     const max = Number(globalSettings.maxOffset);
@@ -113,7 +114,7 @@ const App: React.FC = () => {
     if (nextOffset > max) nextOffset = max;
     if (nextOffset < min) nextOffset = min;
     
-    if (Math.abs(nextOffset - baseOffset) < 0.01) return; 
+    if (Math.abs(nextOffset - baseOffset) < 0.001) return; 
 
     lastClickTime.current = Date.now();
     setOptimisticOffset(nextOffset);
@@ -121,7 +122,7 @@ const App: React.FC = () => {
     setStatus(prev => prev ? {
       ...prev,
       offset: nextOffset,
-      sollTemp: Number(prev.sollTemp) + (nextOffset - baseOffset)
+      sollTemp: Number(prev.sollTemp) + (nextOffset - (optimisticOffset !== null ? optimisticOffset : Number(prev.offset)))
     } : null);
     
     const ok = await gekkoService.setAdjustment(nextOffset, currentRoomId);
@@ -176,7 +177,7 @@ const App: React.FC = () => {
         />
       </div>
       <main className="flex-1 flex flex-col relative pb-4">
-        {status && <MainControl soll={status.sollTemp} ist={status.istTemp} offset={status.offset} mode={status.betriebsart} onAdjust={handleTempAdjust} stepSize={0.5} />}
+        {status && <MainControl soll={status.sollTemp} ist={status.istTemp} offset={status.offset} mode={status.betriebsart} onAdjust={handleTempAdjust} stepSize={Number(globalSettings.stepSize)} />}
         {status && <StatusLine regler={status.reglerPercent} ventilator={status.ventilatorState} />}
         {status && <Footer hauptMode={status.hauptbetriebsart} subMode={status.betriebsart} feuchte={status.feuchte} />}
       </main>
