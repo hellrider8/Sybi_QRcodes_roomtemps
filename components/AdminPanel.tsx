@@ -26,6 +26,10 @@ const AdminPanel: React.FC<AdminPanelProps> = ({ onClose, onPreviewRoom }) => {
   }, [config]);
 
   const handleSave = async () => {
+    if (!config.useMock && config.rooms.length === 0) {
+      if (!confirm("Du hast keine echten Räume geladen. Fortfahren?")) return;
+    }
+    
     setIsSaving(true);
     try {
       const validatedConfig = {
@@ -77,10 +81,12 @@ const AdminPanel: React.FC<AdminPanelProps> = ({ onClose, onPreviewRoom }) => {
         // Filtere doppelte oder Demo-Räume aus, wenn wir im Echt-Modus sind
         const filtered = result.rooms.filter(r => r.category !== 'DEMO' || config.useMock);
         setConfig({ ...config, rooms: filtered });
-        alert(`${filtered.length} Räume eingelesen.`);
+        alert(`${filtered.length} Räume erfolgreich eingelesen.`);
+      } else {
+        alert(`Keine Räume gefunden.\n\nDiagnose: ${result.debugInfo}\nFehler: ${result.error || 'Keiner'}`);
       }
-    } catch (e) {
-      alert("Suche fehlgeschlagen.");
+    } catch (e: any) {
+      alert("Schwerwiegender Fehler bei der Suche: " + e.message);
     } finally {
       setIsDiscovering(false);
     }
@@ -123,7 +129,7 @@ const AdminPanel: React.FC<AdminPanelProps> = ({ onClose, onPreviewRoom }) => {
       link.download = `TEKKO_Export_${new Date().toISOString().split('T')[0]}.zip`;
       link.click();
     } catch (error) {
-      alert("Fehler.");
+      alert("Fehler beim Export.");
     } finally {
       setIsExporting(false);
     }
@@ -134,8 +140,8 @@ const AdminPanel: React.FC<AdminPanelProps> = ({ onClose, onPreviewRoom }) => {
     setConfig({...config, useMock: newMockState});
     setHasChangedMode(true);
     if (!newMockState) {
-       setActiveTab('rooms');
-       alert("Simulation deaktiviert. Bitte klicke jetzt auf 'Suchen', um deine echten Räume zu laden!");
+       setActiveTab('api');
+       alert("Simulation deaktiviert. Bitte prüfe jetzt die Verbindung und suche dann im Reiter 'Räume' nach deinen echten Komponenten.");
     }
   };
 
@@ -168,10 +174,10 @@ const AdminPanel: React.FC<AdminPanelProps> = ({ onClose, onPreviewRoom }) => {
 
       <div className="flex-1 overflow-y-auto p-4 sm:p-8 bg-slate-50">
         {hasChangedMode && (
-          <div className="max-w-md mx-auto mb-6 bg-red-50 border border-red-200 p-4 rounded-xl flex items-center gap-3 animate-bounce">
+          <div className="max-w-md mx-auto mb-6 bg-red-50 border border-red-200 p-4 rounded-xl flex items-center gap-3 animate-pulse">
             <TriangleAlert className="text-red-500 flex-shrink-0" size={24} />
             <p className="text-[10px] font-bold text-red-700 uppercase leading-tight">
-              Änderung erkannt! Du musst unten auf "SPEICHERN" klicken, damit dein Handy den neuen Modus übernimmt.
+              Modus geändert! Speichern erforderlich, damit QR-Codes und Live-Daten funktionieren.
             </p>
           </div>
         )}
@@ -190,23 +196,23 @@ const AdminPanel: React.FC<AdminPanelProps> = ({ onClose, onPreviewRoom }) => {
 
             <div className="bg-white p-6 rounded-xl border shadow-sm space-y-5">
               <div className="flex p-1 bg-slate-100 rounded-lg">
-                <button onClick={() => setConfig({...config, apiMode: 'local'})} className={`flex-1 py-2 rounded text-[10px] font-bold ${config.apiMode === 'local' ? 'bg-white text-[#00828c]' : 'text-slate-500'}`}>LOKAL (LAN)</button>
-                <button onClick={() => setConfig({...config, apiMode: 'cloud'})} className={`flex-1 py-2 rounded text-[10px] font-bold ${config.apiMode === 'cloud' ? 'bg-white text-[#00828c]' : 'text-slate-500'}`}>CLOUD (LiveID)</button>
+                <button onClick={() => setConfig({...config, apiMode: 'local'})} className={`flex-1 py-2 rounded text-[10px] font-bold ${config.apiMode === 'local' ? 'bg-white text-[#00828c] shadow-sm' : 'text-slate-500'}`}>LOKAL (LAN)</button>
+                <button onClick={() => setConfig({...config, apiMode: 'cloud'})} className={`flex-1 py-2 rounded text-[10px] font-bold ${config.apiMode === 'cloud' ? 'bg-white text-[#00828c] shadow-sm' : 'text-slate-500'}`}>CLOUD (LiveID)</button>
               </div>
 
               {config.apiMode === 'cloud' && (
-                <div className="space-y-2">
+                <div className="space-y-2 animate-in fade-in slide-in-from-top-2 duration-300">
                   <label className="text-[9px] font-bold uppercase text-slate-400 block ml-1">Cloud Provider</label>
                   <div className="flex p-1 bg-slate-100 rounded-lg border border-slate-200">
                     <button 
                       onClick={() => setConfig({...config, cloudProvider: 'gekko'})} 
-                      className={`flex-1 py-2 rounded text-[10px] font-bold transition-all ${config.cloudProvider === 'gekko' ? 'bg-[#00828c] text-white shadow-sm' : 'text-slate-500'}`}
+                      className={`flex-1 py-2 rounded text-[10px] font-bold transition-all ${config.cloudProvider === 'gekko' ? 'bg-[#00828c] text-white shadow-md scale-[1.02]' : 'text-slate-500'}`}
                     >
                       myGEKKO
                     </button>
                     <button 
                       onClick={() => setConfig({...config, cloudProvider: 'tekko'})} 
-                      className={`flex-1 py-2 rounded text-[10px] font-bold transition-all ${config.cloudProvider === 'tekko' ? 'bg-[#00828c] text-white shadow-sm' : 'text-slate-500'}`}
+                      className={`flex-1 py-2 rounded text-[10px] font-bold transition-all ${config.cloudProvider === 'tekko' ? 'bg-[#00828c] text-white shadow-md scale-[1.02]' : 'text-slate-500'}`}
                     >
                       TEKKO
                     </button>
@@ -215,19 +221,19 @@ const AdminPanel: React.FC<AdminPanelProps> = ({ onClose, onPreviewRoom }) => {
               )}
 
               <div className="space-y-4">
-                <input type="text" placeholder={config.apiMode === 'local' ? "IP (z.B. 10.10.10.50)" : "Live-ID / Gekko-ID"} className="admin-input" value={config.apiMode === 'local' ? config.ip : config.gekkoId} onChange={e => setConfig(config.apiMode === 'local' ? {...config, ip: e.target.value} : {...config, gekkoId: e.target.value})} />
+                <input type="text" placeholder={config.apiMode === 'local' ? "IP-Adresse des myGEKKO" : "Live-ID / Cloud-ID"} className="admin-input" value={config.apiMode === 'local' ? config.ip : config.gekkoId} onChange={e => setConfig(config.apiMode === 'local' ? {...config, ip: e.target.value} : {...config, gekkoId: e.target.value})} />
                 <div className="grid grid-cols-2 gap-3">
-                  <input type="text" placeholder="Benutzer" className="admin-input" value={config.username} onChange={e => setConfig({...config, username: e.target.value})} />
-                  <input type="password" placeholder="Key" className="admin-input" value={config.password} onChange={e => setConfig({...config, password: e.target.value})} />
+                  <input type="text" placeholder="Benutzername" className="admin-input" value={config.username} onChange={e => setConfig({...config, username: e.target.value})} />
+                  <input type="password" placeholder="Passwort/Key" className="admin-input" value={config.password} onChange={e => setConfig({...config, password: e.target.value})} />
                 </div>
               </div>
 
-              <button onClick={testConnection} disabled={isTesting} className="w-full py-3 bg-slate-900 text-white rounded-lg text-xs font-bold flex items-center justify-center gap-2 uppercase tracking-widest">
-                {isTesting ? <RefreshCw className="animate-spin" size={14}/> : <Wifi size={14}/>} Testen
+              <button onClick={testConnection} disabled={isTesting} className="w-full py-3 bg-slate-900 text-white rounded-lg text-xs font-bold flex items-center justify-center gap-2 uppercase tracking-widest hover:bg-black transition-colors active:scale-[0.98]">
+                {isTesting ? <RefreshCw className="animate-spin" size={14}/> : <Wifi size={14}/>} Verbindung testen
               </button>
 
               {testResult.msg && (
-                <div className={`p-4 rounded-lg text-[10px] font-bold flex items-center gap-2 border ${testResult.success ? 'bg-green-50 text-green-700 border-green-200' : 'bg-red-50 text-red-700 border-red-200'}`}>
+                <div className={`p-4 rounded-lg text-[10px] font-bold flex items-center gap-2 border animate-in zoom-in-95 duration-200 ${testResult.success ? 'bg-green-50 text-green-700 border-green-200' : 'bg-red-50 text-red-700 border-red-200'}`}>
                   {testResult.success ? <CheckCircle2 size={14}/> : <AlertCircle size={14}/>} {testResult.msg}
                 </div>
               )}
@@ -238,45 +244,61 @@ const AdminPanel: React.FC<AdminPanelProps> = ({ onClose, onPreviewRoom }) => {
         {activeTab === 'rooms' && (
           <div className="max-w-2xl mx-auto space-y-4 pb-20">
              <div className="flex justify-between items-center mb-4">
-               <h3 className="text-xs font-bold uppercase text-slate-400">Raumliste</h3>
-               <button onClick={handleDiscover} disabled={isDiscovering} className="bg-[#00828c] text-white px-4 py-2 rounded-lg text-[10px] font-bold flex items-center gap-2 uppercase shadow-md">
-                 {isDiscovering ? <RefreshCw size={12} className="animate-spin"/> : <Search size={12}/>} Suchen & Importieren
+               <h3 className="text-xs font-bold uppercase text-slate-400 tracking-wider">Erkannte Räume</h3>
+               <button onClick={handleDiscover} disabled={isDiscovering} className="bg-[#00828c] text-white px-5 py-2.5 rounded-lg text-[10px] font-bold flex items-center gap-2 uppercase shadow-lg hover:bg-[#006a72] active:scale-95 transition-all">
+                 {isDiscovering ? <RefreshCw size={12} className="animate-spin"/> : <Search size={12}/>} Liste vom Gekko laden
                </button>
              </div>
 
              {config.useMock && (
                <div className="bg-amber-50 border border-amber-200 p-4 rounded-xl flex gap-3 items-center mb-6">
                  <Info className="text-amber-500" size={20}/>
-                 <p className="text-[10px] text-amber-800 font-medium uppercase">Du bist im Simulationsmodus. Die Liste unten zeigt Test-Räume. Schalte auf Echtzeit-Betrieb um echte Räume zu sehen.</p>
+                 <p className="text-[10px] text-amber-800 font-medium uppercase">Achtung: Du bist im Simulationsmodus. Die Suche liefert nur Demo-Daten. Deaktiviere die Simulation im Reiter "Verbindung" für echte Daten.</p>
                </div>
              )}
 
-             {config.rooms.map((r, i) => (
-               <div key={r.id} className="bg-white p-4 rounded-xl border shadow-sm flex items-center justify-between gap-4">
-                 <div className="flex-1">
-                    <span className="text-[8px] font-bold text-slate-400 uppercase block mb-1">ID: {r.id}</span>
-                    <input type="text" className="admin-input" value={r.name} onChange={e => updateRoom(i, {name: e.target.value})} />
+             <div className="grid gap-3">
+               {config.rooms.length === 0 ? (
+                 <div className="bg-white p-12 rounded-2xl border border-dashed border-slate-300 flex flex-col items-center text-center">
+                   <div className="w-12 h-12 bg-slate-100 rounded-full flex items-center justify-center mb-4">
+                     <Search className="text-slate-400" size={24}/>
+                   </div>
+                   <p className="text-xs text-slate-400 font-medium">Noch keine Räume geladen.<br/>Klicke oben auf "Liste laden".</p>
                  </div>
-                 <button onClick={() => setConfig({...config, rooms: config.rooms.filter((_, idx) => idx !== i)})} className="text-red-400 p-2"><Trash2 size={16}/></button>
-               </div>
-             ))}
+               ) : (
+                 config.rooms.map((r, i) => (
+                   <div key={r.id} className="bg-white p-4 rounded-xl border shadow-sm flex items-center justify-between gap-4 hover:border-[#00828c] transition-colors group">
+                     <div className="flex-1">
+                        <span className="text-[8px] font-bold text-slate-400 uppercase block mb-1">Objekt-ID: {r.id}</span>
+                        <input type="text" className="admin-input border-none bg-slate-50 focus:bg-white" value={r.name} onChange={e => updateRoom(i, {name: e.target.value})} />
+                     </div>
+                     <button onClick={() => setConfig({...config, rooms: config.rooms.filter((_, idx) => idx !== i)})} className="text-slate-300 hover:text-red-500 p-2 transition-colors"><Trash2 size={16}/></button>
+                   </div>
+                 ))
+               )}
+             </div>
           </div>
         )}
 
         {activeTab === 'export' && (
           <div className="max-w-4xl mx-auto space-y-6">
-            <div className="bg-white p-6 rounded-2xl shadow-sm border border-slate-200 flex justify-between items-center">
-              <h3 className="text-xs font-bold uppercase">QR-Code Export</h3>
-              <button onClick={exportAllQrCodes} disabled={isExporting} className="bg-slate-900 text-white px-6 py-2 rounded-lg text-[10px] font-bold uppercase flex items-center gap-2">
-                <Download size={14}/> ZIP Export
+            <div className="bg-white p-6 rounded-2xl shadow-sm border border-slate-200 flex flex-col sm:flex-row justify-between items-center gap-4">
+              <div>
+                <h3 className="text-xs font-bold uppercase mb-1">QR-Code Management</h3>
+                <p className="text-[10px] text-slate-400 uppercase">Generiere und exportiere Zugangscodes für alle Räume.</p>
+              </div>
+              <button onClick={exportAllQrCodes} disabled={isExporting || config.rooms.length === 0} className="w-full sm:w-auto bg-slate-900 text-white px-6 py-2.5 rounded-lg text-[10px] font-bold uppercase flex items-center justify-center gap-2 hover:bg-black transition-all shadow-md active:scale-95">
+                {isExporting ? <RefreshCw className="animate-spin" size={14}/> : <Download size={14}/>} ZIP-Archiv laden
               </button>
             </div>
             <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
                {config.rooms.map(r => (
-                 <div key={r.id} className="bg-white p-6 border rounded-2xl flex flex-col items-center">
-                   <span className="text-[10px] font-bold mb-4 uppercase text-slate-400">{r.name}</span>
-                   <QRCodeCanvas value={getQrUrl(r.id)} size={140} level="H" includeMargin={true} />
-                   <button onClick={() => copyToClipboard(getQrUrl(r.id))} className="mt-4 text-[9px] text-slate-400 uppercase font-bold flex items-center gap-1"><Copy size={10}/> Kopieren</button>
+                 <div key={r.id} className="bg-white p-6 border rounded-2xl flex flex-col items-center hover:shadow-md transition-shadow">
+                   <span className="text-[10px] font-bold mb-4 uppercase text-[#00828c] text-center">{r.name}</span>
+                   <div className="p-2 bg-white border rounded-lg shadow-inner">
+                    <QRCodeCanvas value={getQrUrl(r.id)} size={140} level="H" includeMargin={true} />
+                   </div>
+                   <button onClick={() => copyToClipboard(getQrUrl(r.id))} className="mt-4 text-[9px] text-slate-400 uppercase font-bold flex items-center gap-1 hover:text-[#00828c] transition-colors"><Copy size={10}/> Link kopieren</button>
                  </div>
                ))}
             </div>
@@ -286,15 +308,25 @@ const AdminPanel: React.FC<AdminPanelProps> = ({ onClose, onPreviewRoom }) => {
         {activeTab === 'hosting' && (
           <div className="max-w-md mx-auto space-y-6">
             <div className="bg-white p-6 rounded-2xl border shadow-sm">
-               <h3 className="font-bold text-xs mb-4 uppercase text-[#00828c]">Sitzung & Sicherheit</h3>
+               <h3 className="font-bold text-xs mb-4 uppercase text-[#00828c] border-b pb-2">Regelwerk & Sitzung</h3>
                <div className="space-y-4">
                  <div>
-                   <label className="text-[9px] font-bold uppercase text-slate-400 block mb-1">Sitzungsdauer (Min.)</label>
+                   <label className="text-[9px] font-bold uppercase text-slate-400 block mb-1">Gültigkeit QR-Code (Minuten)</label>
                    <input type="number" className="admin-input" value={config.sessionDurationMinutes} onChange={e => setConfig({...config, sessionDurationMinutes: Number(e.target.value)})} />
                  </div>
+                 <div className="grid grid-cols-2 gap-3">
+                   <div>
+                    <label className="text-[9px] font-bold uppercase text-slate-400 block mb-1">Min. Offset</label>
+                    <input type="number" step="0.5" className="admin-input" value={config.minOffset} onChange={e => setConfig({...config, minOffset: Number(e.target.value)})} />
+                   </div>
+                   <div>
+                    <label className="text-[9px] font-bold uppercase text-slate-400 block mb-1">Max. Offset</label>
+                    <input type="number" step="0.5" className="admin-input" value={config.maxOffset} onChange={e => setConfig({...config, maxOffset: Number(e.target.value)})} />
+                   </div>
+                 </div>
                  <div>
-                   <label className="text-[9px] font-bold uppercase text-slate-400 block mb-1">Sicherheitsschlüssel</label>
-                   <input type="text" className="admin-input font-mono" value={config.secretKey} onChange={e => setConfig({...config, secretKey: e.target.value})} />
+                   <label className="text-[9px] font-bold uppercase text-slate-400 block mb-1">Sicherheitsschlüssel (Secret)</label>
+                   <input type="text" className="admin-input font-mono text-[11px]" value={config.secretKey} onChange={e => setConfig({...config, secretKey: e.target.value})} />
                  </div>
                </div>
             </div>
@@ -302,15 +334,15 @@ const AdminPanel: React.FC<AdminPanelProps> = ({ onClose, onPreviewRoom }) => {
         )}
       </div>
 
-      <div className="p-4 border-t flex justify-end gap-3 bg-white shadow-[0_-4px_10px_rgba(0,0,0,0.05)]">
-        <button onClick={onClose} className="px-6 py-2 text-xs font-bold text-slate-400 uppercase">Abbrechen</button>
+      <div className="p-4 border-t flex justify-end gap-3 bg-white shadow-[0_-4px_15px_rgba(0,0,0,0.08)]">
+        <button onClick={onClose} className="px-6 py-2 text-xs font-bold text-slate-400 uppercase hover:text-slate-600">Schließen</button>
         <button 
           onClick={handleSave} 
           disabled={isSaving}
           className={`px-10 py-3 rounded-lg text-xs font-bold uppercase shadow-lg transition-all flex items-center gap-2 ${hasChangedMode ? 'bg-red-600 hover:bg-red-700 text-white animate-pulse' : 'bg-[#00828c] hover:bg-[#006a72] text-white'}`}
         >
           {isSaving ? <RefreshCw className="animate-spin" size={14}/> : <Save size={14}/>}
-          {isSaving ? 'Speichere...' : 'Speichern'}
+          {isSaving ? 'Wird gespeichert...' : 'Konfiguration Speichern'}
         </button>
       </div>
     </div>

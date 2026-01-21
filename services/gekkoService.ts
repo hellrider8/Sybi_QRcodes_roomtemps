@@ -46,7 +46,6 @@ class GekkoService {
     return this.config;
   }
 
-  // Fix: Added missing method to update internal config state, used by AdminPanel for live preview synchronization.
   updateInternalConfig(newConfig: GekkoConfig) {
     this.config = { ...newConfig };
   }
@@ -137,20 +136,19 @@ class GekkoService {
     return { mode: 'cors', cache: 'no-cache', headers };
   }
 
-  // Fix: Improved status messages for connection tests to provide clearer feedback in AdminPanel.
   async testConnection(): Promise<{ success: boolean; message: string }> {
     if (this.config.useMock) return { success: true, message: "Simulation ist AKTIV (OK)" };
     const url = this.getUrl('/roomtemps/');
     try {
       const response = await fetch(url, this.getFetchOptions());
       if (response.ok) return { success: true, message: "Verbindung zum echten Gekko erfolgreich!" };
-      return { success: false, message: `Fehler: HTTP ${response.status} (Prüfe User/Passwort)` };
+      const errText = await response.text();
+      return { success: false, message: `HTTP ${response.status}: ${errText.substring(0, 50)}` };
     } catch (e: any) {
       return { success: false, message: "Server nicht erreichbar. IP oder Cloud-ID prüfen." };
     }
   }
 
-  // Fix: Added descriptive labels for demo rooms and improved logging during discovery.
   async discoverRooms(): Promise<DiscoveryResult> {
     if (this.config.useMock) {
       return {
@@ -164,17 +162,52 @@ class GekkoService {
     }
     const url = this.getUrl('/roomtemps/');
     try {
+      console.log("[GEKKO-SERVICE] Suche Räume unter:", url);
       const response = await fetch(url, this.getFetchOptions());
+      if (!response.ok) {
+        throw new Error(`HTTP ${response.status} beim Abruf der Raumliste`);
+      }
+      
       const rawData = await response.json();
+      console.log("[GEKKO-SERVICE] Rohdaten empfangen:", rawData);
+      
+      // Unterstützung für verschiedene Gekko-Strukturen (Array oder Objekt)
       const items = rawData.roomtemps || rawData;
       const rooms: RoomDefinition[] = [];
-      for (const id in items) {
-        if (typeof items[id] === 'object' && items[id] !== null) {
-          rooms.push({ id, name: items[id].name || id, category: items[id].page || "RÄUME", enabled: true });
+      
+      if (Array.isArray(items)) {
+        console.log("[GEKKO-SERVICE] Verarbeite Array-Struktur");
+        items.forEach((item: any, index: number) => {
+          if (item && typeof item === 'object') {
+            const id = item.id || `item${index}`;
+            rooms.push({ 
+              id: String(id), 
+              name: item.name || String(id), 
+              category: item.page || "RÄUME", 
+              enabled: true 
+            });
+          }
+        });
+      } else if (typeof items === 'object' && items !== null) {
+        console.log("[GEKKO-SERVICE] Verarbeite Objekt-Struktur");
+        for (const key in items) {
+          if (key.startsWith('_')) continue; // Metadaten überspringen
+          const item = items[key];
+          if (item && typeof item === 'object') {
+            rooms.push({ 
+              id: key, 
+              name: item.name || key, 
+              category: item.page || "RÄUME", 
+              enabled: true 
+            });
+          }
         }
       }
-      return { rooms, rawData, debugInfo: "Import erfolgreich" };
+
+      console.log(`[GEKKO-SERVICE] ${rooms.length} Räume validiert.`);
+      return { rooms, rawData, debugInfo: `Suche beendet: ${rooms.length} Räume gefunden.` };
     } catch (e: any) {
+      console.error("[GEKKO-SERVICE] Discovery Error:", e);
       return { rooms: [], rawData: null, debugInfo: "Import fehlgeschlagen", error: e.message };
     }
   }
