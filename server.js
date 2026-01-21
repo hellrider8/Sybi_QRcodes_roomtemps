@@ -1,4 +1,3 @@
-
 const express = require('express');
 const path = require('path');
 const cors = require('cors');
@@ -17,31 +16,28 @@ try {
         console.log('[FIREBASE] Admin SDK initialisiert.');
     }
 } catch (e) {
-    console.error('[FIREBASE] Initialisierungsfehler (nicht kritisch für Start):', e.message);
+    console.error('[FIREBASE] Initialisierungsfehler:', e.message);
 }
 
-/** 
- * KORREKTE SYNTAX für benannte Datenbanken in Node.js:
- * Wir nutzen getFirestore('ID') statt admin.firestore('ID')
- */
+// Datenbank-ID explizit auf 'tekkoconfig' setzen
 let db;
 let configRef;
 
 try {
-    // Versuche die benannte Datenbank 'tekkoconfig' zu laden
     db = getFirestore('tekkoconfig');
     configRef = db.collection('configs').doc('global');
-    console.log('[FIRESTORE] Verbindung zu Datenbank "tekkoconfig" vorbereitet.');
+    console.log('[FIRESTORE] Datenbank "tekkoconfig" erfolgreich verbunden.');
 } catch (e) {
-    console.error('[FIRESTORE] Fehler beim Zugriff auf "tekkoconfig". Nutze Fallback auf Default.', e.message);
-    db = admin.firestore(); // Fallback auf Standard-DB
+    console.error('[FIRESTORE] Fehler beim Zugriff auf "tekkoconfig":', e.message);
+    // Fallback auf Default, falls tekkoconfig nicht erreichbar
+    db = admin.firestore();
     configRef = db.collection('configs').doc('global');
 }
 
 app.use(cors());
 app.use(express.json({ limit: '1mb' }));
 
-// Hilfsfunktion: Entfernt alle 'undefined' Werte tiefgreifend
+// Hilfsfunktion: Entfernt alle 'undefined' Werte
 function sanitize(obj) {
   if (Array.isArray(obj)) {
     return obj.map(v => sanitize(v));
@@ -72,66 +68,38 @@ const DEFAULT_CONFIG = {
     lastUpdated: 0
 };
 
-// API: Konfiguration laden
 app.get('/api/config', async (req, res) => {
     try {
         const doc = await configRef.get();
-        if (!doc.exists) {
-            return res.json(DEFAULT_CONFIG);
-        }
+        if (!doc.exists) return res.json(DEFAULT_CONFIG);
         res.json({ ...DEFAULT_CONFIG, ...doc.data() });
     } catch (err) {
-        console.error('[CONFIG-GET-ERROR]', err.message);
         res.json(DEFAULT_CONFIG);
     }
 });
 
-// API: Konfiguration speichern
 app.post('/api/config', async (req, res) => {
     try {
         const cleanData = sanitize(req.body);
-        const newConfig = { 
-            ...cleanData, 
-            lastUpdated: Date.now() 
-        };
-        
-        console.log(`[FIRESTORE] Speichere Konfiguration...`);
+        const newConfig = { ...cleanData, lastUpdated: Date.now() };
         await configRef.set(newConfig, { merge: true });
-        console.log(`[FIRESTORE] Speichern erfolgreich.`);
-        
         res.json(newConfig);
     } catch (err) {
-        console.error('[FIRESTORE-SAVE-ERROR]', err);
-        res.status(500).json({ 
-            error: 'Datenbank-Fehler', 
-            details: err.message
-        });
+        res.status(500).json({ error: 'Datenbank-Fehler', details: err.message });
     }
 });
 
-// Proxy für API-Anfragen an myGEKKO
 app.get('/api/proxy', async (req, res) => {
     const targetUrl = req.query.url;
     if (!targetUrl) return res.status(400).send('Missing url');
-
     try {
-        const fetchOptions = {
-            method: 'GET',
-            headers: { 'Accept': 'application/json' }
-        };
-
-        if (req.headers.authorization) {
-            fetchOptions.headers['Authorization'] = req.headers.authorization;
-        }
-
+        const fetchOptions = { method: 'GET', headers: { 'Accept': 'application/json' } };
+        if (req.headers.authorization) fetchOptions.headers['Authorization'] = req.headers.authorization;
         const response = await fetch(targetUrl, fetchOptions);
         const data = await response.text();
-        
-        res.status(response.status);
-        res.set('Content-Type', response.headers.get('content-type') || 'application/json');
-        res.send(data);
+        res.status(response.status).send(data);
     } catch (err) {
-        res.status(502).send('Proxy Request Failed');
+        res.status(502).send('Proxy Failed');
     }
 });
 
@@ -157,5 +125,5 @@ app.use(express.static(__dirname));
 app.get('*', (req, res) => res.sendFile(path.join(__dirname, 'index.html')));
 
 app.listen(PORT, '0.0.0.0', () => {
-    console.log(`TEKKO Server running on port ${PORT}`);
+    console.log(`Server läuft auf Port ${PORT}`);
 });
