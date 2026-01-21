@@ -1,0 +1,22 @@
+FROM node:20-slim
+
+# Arbeitsverzeichnis festlegen
+WORKDIR /usr/src/app
+
+# System-Abhängigkeiten installieren
+RUN apt-get update && apt-get install -y ca-certificates && rm -rf /var/lib/apt/lists/*
+
+# Abhängigkeiten kopieren
+COPY package*.json ./
+
+# Nur Produktions-Abhängigkeiten installieren
+RUN npm install --production
+
+# Quellcode kopieren
+COPY . .
+
+# Port 8080 für Cloud Run
+EXPOSE 8080
+
+# Startbefehl
+CMD [ "node", "server.js" ]
