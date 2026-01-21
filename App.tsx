@@ -10,6 +10,7 @@ import { GekkoStatus } from './types.ts';
 import { AlertCircle } from 'lucide-react';
 
 const STATUS_POLLING_MS = 10000;
+const EXPIRY_CHECK_MS = 10000;
 const SYNC_LOCK_TIMEOUT_MS = 5000; 
 
 const App: React.FC = () => {
@@ -43,6 +44,22 @@ const App: React.FC = () => {
       stepSize: config.stepSize !== undefined ? Number(config.stepSize) : 0.5
     });
   };
+
+  const checkExpiry = useCallback(() => {
+    if (showAdmin || isPreview) return;
+    
+    const sessionStartStr = localStorage.getItem('gekko_session_start');
+    if (sessionStartStr) {
+      const sessionStart = parseInt(sessionStartStr);
+      const elapsedMs = Date.now() - sessionStart;
+      const limitMs = globalSettings.sessionDurationMinutes * 60 * 1000;
+      
+      if (elapsedMs > limitMs) {
+        setIsExpired(true);
+        setExpiryReason("Sitzungszeit abgelaufen");
+      }
+    }
+  }, [globalSettings.sessionDurationMinutes, showAdmin, isPreview]);
 
   const refreshData = useCallback(async () => {
     if (loading || isExpired || !currentRoomId || showAdmin) return;
@@ -88,16 +105,29 @@ const App: React.FC = () => {
           setIsExpired(false);
         } else {
           setIsExpired(true);
-          setExpiryReason("Token ungültig");
+          setExpiryReason("Ungültiger QR-Code");
         }
       } else if (roomIdDirect) {
+        // Bei direktem Raum-Parameter prüfen wir, ob eine Sitzung existiert
         setCurrentRoomId(roomIdDirect);
         gekkoService.setCurrentRoom(roomIdDirect);
+        checkExpiry();
+      } else {
+        // Weder Token noch Raum -> Abgelaufen
+        setIsExpired(true);
       }
       setLoading(false);
     };
     init();
-  }, []);
+  }, [checkExpiry]);
+
+  // Laufende Überprüfung der Zeit
+  useEffect(() => {
+    if (!loading && !isExpired && !showAdmin && !isPreview) {
+      const interval = setInterval(checkExpiry, EXPIRY_CHECK_MS);
+      return () => clearInterval(interval);
+    }
+  }, [checkExpiry, loading, isExpired, showAdmin, isPreview]);
 
   const handleTempAdjust = async (delta: number) => {
     if (!status || isExpired || !currentRoomId) return;
@@ -105,7 +135,6 @@ const App: React.FC = () => {
     const baseOffset = optimisticOffset !== null ? optimisticOffset : Number(status.offset);
     const step = Number(globalSettings.stepSize) || 0.5;
     
-    // Dynamische Berechnung basierend auf der Schrittweite aus dem Backend
     let nextOffset = Math.round((baseOffset + delta) / step) * step;
     
     const min = Number(globalSettings.minOffset);

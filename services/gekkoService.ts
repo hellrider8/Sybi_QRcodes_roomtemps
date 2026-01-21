@@ -129,9 +129,9 @@ class GekkoService {
     const url = this.getUrl('/roomtemps/');
     try {
       const response = await fetch(url, this.getFetchOptions());
-      if (response.ok) return { success: true, message: "Verbindung steht!" };
-      return { success: false, message: `Fehler: HTTP ${response.status}` };
-    } catch (e) { return { success: false, message: "Nicht erreichbar" }; }
+      if (response.ok) return { success: true, message: "Verbindung erfolgreich!" };
+      return { success: false, message: `Fehler: ${response.status}` };
+    } catch (e) { return { success: false, message: "Server nicht erreichbar" }; }
   }
 
   async discoverRooms(): Promise<DiscoveryResult> {
@@ -167,7 +167,7 @@ class GekkoService {
       } else {
         for (const k in items) if (!k.startsWith('_')) processItem(k, items[k]);
       }
-      return { rooms, rawData, debugInfo: "Erfolgreich" };
+      return { rooms, rawData, debugInfo: "Import erfolgreich" };
     } catch (e: any) {
       return { rooms: [], rawData: null, debugInfo: "Fehler", error: e.message };
     }
@@ -186,7 +186,7 @@ class GekkoService {
     const response = await fetch(url, this.getFetchOptions());
     const allStatusData = await response.json();
     const itemData = allStatusData[roomId];
-    if (!itemData) throw new Error(`Raum ${roomId} fehlt`);
+    if (!itemData) throw new Error(`Raum ${roomId} nicht im Datensatz`);
     const vals = (itemData.sumstate?.value || itemData.sumstate || "").split(';');
     return {
       istTemp: parseFloat(vals[0]) || 0,
