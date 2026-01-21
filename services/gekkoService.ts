@@ -1,4 +1,3 @@
-
 import { GekkoStatus, GekkoConfig, RoomDefinition } from '../types.ts';
 
 export interface DiscoveryResult {
@@ -167,7 +166,7 @@ class GekkoService {
       const processItem = (id: string, item: any) => {
         if (!item || typeof item !== 'object') return;
         const name = item.name || id;
-        // Filtert alle Elemente aus, die "GROUP" im Namen enthalten
+        // Ignoriere alle 'GROUP' Elemente (case-insensitive)
         if (name.toUpperCase().includes('GROUP')) return;
         
         rooms.push({ 

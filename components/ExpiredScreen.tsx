@@ -1,4 +1,3 @@
-
 import React from 'react';
 import { QrCode, Lock, AlertTriangle, RefreshCw } from 'lucide-react';
 
@@ -21,9 +20,9 @@ const ExpiredScreen: React.FC<ExpiredScreenProps> = ({ reason, sessionMinutes = 
         <QrCode size={120} strokeWidth={1} className="opacity-20" />
         <Lock size={40} className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 text-white" />
       </div>
-      <h2 className="text-2xl font-extralight tracking-wide mb-4 uppercase">Zugriff abgelaufen</h2>
+      <h2 className="text-2xl font-extralight tracking-wide mb-4 uppercase">Zugriff beendet</h2>
       <p className="text-sm font-extralight opacity-80 leading-relaxed max-w-xs mb-10">
-        Die Sitzung von {sessionMinutes} Minuten ist beendet. Bitte scannen Sie den bereitgestellten QR-Code erneut, um die Steuerung freizuschalten.
+        Bitte scannen Sie den QR-Code erneut, um die Steuerung freizuschalten.
       </p>
 
       {reason && (
@@ -38,8 +37,14 @@ const ExpiredScreen: React.FC<ExpiredScreenProps> = ({ reason, sessionMinutes = 
           onClick={handleHardReset}
           className="text-[9px] uppercase tracking-[0.2em] text-white/40 hover:text-white transition-colors flex items-center gap-2 border border-white/10 px-4 py-2 rounded"
         >
-          <RefreshCw size={10} /> App Resetten
+          <RefreshCw size={10} /> App Zurücksetzen
         </button>
+      </div>
+
+      <div className="absolute bottom-10 opacity-30">
+        <a href="https://www.sybtec.de" target="_blank" rel="noopener noreferrer" className="text-[10px] font-bold uppercase tracking-widest text-white">
+          powered by sybtec
+        </a>
       </div>
     </div>
   );

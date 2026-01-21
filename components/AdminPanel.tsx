@@ -1,4 +1,3 @@
-
 import React, { useState, useEffect, useRef } from 'react';
 import { Save, Plus, Trash2, X, Shield, RefreshCw, Globe, Wifi, CheckCircle2, AlertCircle, Copy, Search, Lock, Clock, Download, SlidersHorizontal, Info, TriangleAlert } from 'lucide-react';
 import { gekkoService } from '../services/gekkoService.ts';
@@ -43,7 +42,7 @@ const AdminPanel: React.FC<AdminPanelProps> = ({ onClose, onPreviewRoom }) => {
       const updated = gekkoService.getConfig();
       setConfig(updated);
       setHasChangedMode(false);
-      alert("Einstellungen permanent gespeichert. QR-Codes sind nun gültig.");
+      alert("Einstellungen permanent gespeichert.");
     } catch (e) {
       alert("Speichern fehlgeschlagen.");
     } finally {

@@ -1,4 +1,3 @@
-
 import React, { useState, useEffect, useCallback, useRef } from 'react';
 import Header from './components/Header.tsx';
 import MainControl from './components/MainControl.tsx';
@@ -41,7 +40,7 @@ const App: React.FC = () => {
       sessionDurationMinutes: Number(config.sessionDurationMinutes) || 15,
       minOffset: config.minOffset !== undefined ? Number(config.minOffset) : -3.0,
       maxOffset: config.maxOffset !== undefined ? Number(config.maxOffset) : 3.0,
-      stepSize: config.stepSize !== undefined ? Number(config.stepSize) : 0.5
+      stepSize: 0.5 // Immer fest auf 0.5 für dieses Projekt
     });
   };
 
@@ -89,7 +88,7 @@ const App: React.FC = () => {
           setIsExpired(false);
         } else {
           setIsExpired(true);
-          setExpiryReason("Ungültiger QR-Code");
+          setExpiryReason("Code ungültig");
         }
       } else if (roomIdDirect) {
         setCurrentRoomId(roomIdDirect);
@@ -104,9 +103,9 @@ const App: React.FC = () => {
     if (!status || isExpired || !currentRoomId) return;
     
     const baseOffset = optimisticOffset !== null ? optimisticOffset : Number(status.offset);
-    // Mathematisch saubere Rundung auf 0.5er Schritte
-    const step = Number(globalSettings.stepSize) || 0.5;
-    let nextOffset = Math.round((baseOffset + delta) / step) * step;
+    // Erzwungene Rundung auf 0.5er Schritte
+    const step = 0.5;
+    let nextOffset = Math.round((baseOffset + delta) * 2) / 2;
     
     const min = Number(globalSettings.minOffset);
     const max = Number(globalSettings.maxOffset);
@@ -177,7 +176,7 @@ const App: React.FC = () => {
         />
       </div>
       <main className="flex-1 flex flex-col relative pb-4">
-        {status && <MainControl soll={status.sollTemp} ist={status.istTemp} offset={status.offset} mode={status.betriebsart} onAdjust={handleTempAdjust} stepSize={Number(globalSettings.stepSize)} />}
+        {status && <MainControl soll={status.sollTemp} ist={status.istTemp} offset={status.offset} mode={status.betriebsart} onAdjust={handleTempAdjust} stepSize={0.5} />}
         {status && <StatusLine regler={status.reglerPercent} ventilator={status.ventilatorState} />}
         {status && <Footer hauptMode={status.hauptbetriebsart} subMode={status.betriebsart} feuchte={status.feuchte} />}
       </main>
