@@ -7,6 +7,10 @@ interface FooterProps {
 }
 
 const Footer: React.FC<FooterProps> = ({ hauptMode, subMode, feuchte }) => {
+  // Nur anzeigen, wenn Feuchte vorhanden und echt positiv (> 0)
+  // Viele Gekko-Systeme liefern 0 oder negative Werte, wenn kein Sensor installiert ist.
+  const hasValidHumidity = feuchte > 0;
+
   return (
     <div className="mt-auto w-full">
       {/* Main Footer Panel */}
@@ -29,8 +33,8 @@ const Footer: React.FC<FooterProps> = ({ hauptMode, subMode, feuchte }) => {
             </button>
           </div>
 
-          {/* Feuchte - Nur anzeigen wenn vorhanden (>= 0) */}
-          {feuchte >= 0 && (
+          {/* Feuchte - Nur anzeigen wenn strikt > 0 */}
+          {hasValidHumidity && (
             <div className="flex justify-between items-center text-white pt-2 border-t border-white/5">
               <span className="text-xs font-extralight uppercase tracking-widest opacity-80">Feuchte</span>
               <span className="text-sm font-light tracking-wider mr-2">{feuchte.toFixed(1)} % rF</span>

@@ -10,7 +10,7 @@ import { GekkoStatus } from './types.ts';
 import { AlertCircle } from 'lucide-react';
 
 const STATUS_POLLING_MS = 10000;
-const EXPIRY_CHECK_MS = 5000; // Häufigere Prüfung für bessere User Experience
+const EXPIRY_CHECK_MS = 5000; 
 const SYNC_LOCK_TIMEOUT_MS = 5000; 
 
 const App: React.FC = () => {
@@ -50,9 +50,10 @@ const App: React.FC = () => {
     
     const sessionStartStr = localStorage.getItem('gekko_session_start');
     if (!sessionStartStr) {
-      // Wenn kein Startzeitpunkt da ist, ist die Session ungültig/abgelaufen
-      setIsExpired(true);
-      setExpiryReason("Keine aktive Sitzung");
+      if (!isExpired) {
+        setIsExpired(true);
+        setExpiryReason("Keine aktive Sitzung");
+      }
       return;
     }
 
@@ -63,8 +64,11 @@ const App: React.FC = () => {
     if (elapsedMs > limitMs) {
       setIsExpired(true);
       setExpiryReason("Sitzungszeit abgelaufen");
+      // Sofort säubern
+      localStorage.removeItem('gekko_session_start');
+      localStorage.removeItem('gekko_current_room');
     }
-  }, [globalSettings.sessionDurationMinutes, showAdmin, isPreview]);
+  }, [globalSettings.sessionDurationMinutes, showAdmin, isPreview, isExpired]);
 
   const refreshData = useCallback(async () => {
     if (loading || isExpired || !currentRoomId || showAdmin) return;
@@ -92,13 +96,21 @@ const App: React.FC = () => {
   }, [isExpired, loading, currentRoomId, showAdmin, optimisticOffset]);
 
   const handleLogout = () => {
+    // 1. Daten löschen
     localStorage.removeItem('gekko_session_start');
     localStorage.removeItem('gekko_current_room');
+    
+    // 2. State sofort setzen
     setIsExpired(true);
     setExpiryReason("Abgemeldet");
     setCurrentRoomId(null);
-    // URL säubern ohne Refresh
+    setStatus(null);
+    
+    // 3. URL säubern
     window.history.replaceState({}, '', window.location.origin + window.location.pathname);
+    
+    // 4. Reload für komplett sauberen Boot
+    setTimeout(() => window.location.reload(), 50);
   };
 
   useEffect(() => {
@@ -120,15 +132,13 @@ const App: React.FC = () => {
           setIsExpired(false);
         } else {
           setIsExpired(true);
-          setExpiryReason("Ungültiger QR-Code");
+          setExpiryReason("Ungültiger Zugang");
         }
       } else if (roomIdDirect) {
         setCurrentRoomId(roomIdDirect);
         gekkoService.setCurrentRoom(roomIdDirect);
-        // Prüfen ob Session noch gilt
         checkExpiry();
       } else {
-        // Gar keine Parameter -> Gilt als abgelaufen/kein Zugriff
         setIsExpired(true);
         setExpiryReason("Bitte QR-Code scannen");
       }

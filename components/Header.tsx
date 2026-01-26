@@ -1,4 +1,3 @@
-
 import React, { useState, useEffect } from 'react';
 import { ChevronLeft, LogOut, Globe, FlaskConical } from 'lucide-react';
 
@@ -28,16 +27,23 @@ const Header: React.FC<HeaderProps> = ({ roomName, category, onBack, showBack, i
     return date.toLocaleTimeString('de-DE', { hour: '2-digit', minute: '2-digit' });
   };
 
+  const handleAction = (e: React.MouseEvent) => {
+    // Verhindert, dass der Klick nach oben zum Admin-Trigger (3-Sekunden-Hold) durchreicht
+    e.stopPropagation(); 
+    e.preventDefault();
+    if (onBack) onBack();
+  };
+
   return (
-    <header className="bg-[#00828c] text-white h-16 flex items-center px-4 shadow-md z-10 relative overflow-hidden">
-      <div className="flex flex-col leading-tight absolute left-4 z-20">
+    <header className="bg-[#00828c] text-white h-16 flex items-center px-4 shadow-md z-[70] relative overflow-hidden">
+      <div className="flex flex-col leading-tight absolute left-4 z-20 pointer-events-none">
         <span className="text-xl font-light tracking-tight">{formatTime(time)}</span>
         <span className="text-[10px] font-extralight opacity-80 uppercase tracking-wider">{formatDate(time)}</span>
       </div>
 
-      <div className="flex-1 text-center px-12 sm:px-16">
+      <div className="flex-1 text-center px-12 sm:px-16 pointer-events-none">
         <div className="flex items-center justify-center gap-1 mb-1">
-          <h1 className="text-[10px] font-extralight leading-none tracking-[0.2em] opacity-70 uppercase">Raumregelung</h1>
+          <h1 className="text-[10px] font-extralight leading-none tracking-[0.2em] opacity-70 uppercase">Steuerung</h1>
           {isDemo ? (
             <span className="flex items-center gap-0.5 px-1.5 py-0.5 bg-amber-500 text-[8px] font-bold rounded text-white animate-pulse">
               <FlaskConical size={8} /> DEMO
@@ -54,16 +60,16 @@ const Header: React.FC<HeaderProps> = ({ roomName, category, onBack, showBack, i
       </div>
 
       {showBack && (
-        <div className="absolute right-4 flex items-center z-20">
+        <div className="absolute right-2 flex items-center z-[80]">
           <button 
-            onClick={onBack}
-            className="p-2 hover:bg-black/10 rounded-full transition-colors flex items-center gap-1"
-            title={isLogout ? "Abmelden" : "Zurück"}
+            onClick={handleAction}
+            className="p-3 hover:bg-black/10 active:bg-black/20 rounded-full transition-all flex items-center justify-center"
+            aria-label={isLogout ? "Abmelden" : "Zurück"}
           >
             {isLogout ? (
-              <LogOut size={20} strokeWidth={1.5} className="cursor-pointer text-white/70 hover:text-white" />
+              <LogOut size={22} strokeWidth={2} className="text-white drop-shadow-sm" />
             ) : (
-              <ChevronLeft size={24} strokeWidth={1.5} className="cursor-pointer" />
+              <ChevronLeft size={26} strokeWidth={2} className="text-white" />
             )}
           </button>
         </div>
