@@ -20,17 +20,17 @@ const Footer: React.FC<FooterProps> = ({ hauptMode, subMode, feuchte }) => {
           {/* Hauptbetriebsart */}
           <div className="flex justify-between items-center text-white">
             <span className="text-xs font-extralight uppercase tracking-widest opacity-80">Hauptbetriebsart</span>
-            <button className="bg-[#535353] px-6 py-2 rounded-[2px] min-w-[130px] text-xs font-normal tracking-wide hover:bg-[#404040] active:scale-95 transition-all shadow-sm uppercase">
+            <div className="bg-[#535353] px-6 py-2 rounded-[2px] min-w-[130px] text-xs font-normal tracking-wide shadow-sm uppercase text-center flex items-center justify-center">
               {hauptMode}
-            </button>
+            </div>
           </div>
 
           {/* Betriebsart */}
           <div className="flex justify-between items-center text-white">
             <span className="text-xs font-extralight uppercase tracking-widest opacity-80">Betriebsart</span>
-            <button className="bg-[#006a72] px-6 py-2 rounded-[2px] min-w-[130px] text-xs font-normal tracking-wide border border-white/10 hover:bg-[#005a61] active:scale-95 transition-all shadow-sm uppercase">
+            <div className="bg-[#006a72] px-6 py-2 rounded-[2px] min-w-[130px] text-xs font-normal tracking-wide border border-white/10 shadow-sm uppercase text-center flex items-center justify-center">
               {subMode}
-            </button>
+            </div>
           </div>
 
           {/* Feuchte - Nur anzeigen wenn strikt > 0 */}
