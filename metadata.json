@@ -1,5 +1,5 @@
 {
-  "name": "TEKKO Raumregelung",
+  "name": "Sybi QRcode roomtemp",
   "description": "A high-fidelity recreation of the myGEKKO / TEKKO room control interface for smart homes, featuring real-time temperature monitoring and setpoint adjustment.",
   "requestFramePermissions": []
 }
