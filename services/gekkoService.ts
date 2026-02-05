@@ -176,29 +176,29 @@ class GekkoService {
   async fetchStatus(roomId: string = this.currentRoomId): Promise<GekkoStatus> {
     const room = this.config.rooms.find(r => r.id === roomId);
     if (this.config.useMock) {
-      // Simulation der Zustände für die UI-Tests
       const mockState = Math.random();
-      let hMode = 'AUTOMATIK';
       let bMode = 'KOMFORT';
       let soll = 21.0;
       let ist = 20.5 + Math.random();
       let regler = 20;
 
-      if (mockState > 0.7) {
-        hMode = 'AUS';
+      if (mockState > 0.75) {
         bMode = 'AUS';
         soll = 5.0;
         regler = 0;
-      } else if (mockState > 0.4) {
-        hMode = 'HAND';
-        bMode = 'MANUELL';
+      } else if (mockState > 0.5) {
+        bMode = 'HAND';
         soll = 30.0;
         regler = 100;
+      } else if (mockState > 0.25) {
+        bMode = 'ABSENK';
+        soll = 17.0;
+        regler = 5;
       }
 
       return {
         sollTemp: soll, istTemp: ist, offset: 0, reglerPercent: regler,
-        ventilatorState: 0, hauptbetriebsart: hMode, betriebsart: bMode,
+        ventilatorState: 0, betriebsart: bMode,
         feuchte: 30, roomName: room?.name || "Demo-Raum", category: "DEMO"
       };
     }
@@ -210,18 +210,14 @@ class GekkoService {
     if (!itemData) throw new Error(`Raum ${roomId} nicht im Datensatz`);
     const vals = (itemData.sumstate?.value || itemData.sumstate || "").split(';');
     
-    // Mapping der echten Gekko-Werte
-    const subModeCode = parseInt(vals[3]);
-    let bMode = 'AUTOMATIK';
-    if (subModeCode === 8) bMode = 'KOMFORT';
-    else if (subModeCode === 16) bMode = 'ABSENKUNG';
-    else if (subModeCode === 64) bMode = 'MANUELL';
-    else if (subModeCode === 0) bMode = 'AUS';
-
-    // Bestimmung der Hauptbetriebsart basierend auf den Werten
-    let hMode = 'AUTOMATIK';
-    if (subModeCode === 0 || vals[1] === "5.00") hMode = 'AUS';
-    else if (subModeCode === 64) hMode = 'HAND';
+    // Mapping der Betriebsart basierend auf workingMode (index 3)
+    // 1=off, 8=comfort, 16=reduced, 64=manual
+    const workingModeCode = parseInt(vals[3]);
+    let bMode = 'KOMFORT'; // Default
+    if (workingModeCode === 1) bMode = 'AUS';
+    else if (workingModeCode === 8) bMode = 'KOMFORT';
+    else if (workingModeCode === 16) bMode = 'ABSENK';
+    else if (workingModeCode === 64) bMode = 'HAND';
 
     return {
       istTemp: parseFloat(vals[0]) || 0,
@@ -231,7 +227,6 @@ class GekkoService {
       offset: parseFloat(vals[5]) || 0,
       feuchte: parseFloat(vals[8]) || 0,
       ventilatorState: 0, 
-      hauptbetriebsart: hMode, 
       roomName: itemData.name || room?.name || roomId,
       category: itemData.page || "RÄUME"
     };

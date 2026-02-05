@@ -183,9 +183,10 @@ class GekkoService {
   async fetchStatus(roomId: string = this.currentRoomId): Promise<GekkoStatus> {
     const room = this.config.rooms.find(r => r.id === roomId);
     if (this.config.useMock) {
+      // Fix: Removed 'hauptbetriebsart' as it is not part of GekkoStatus interface
       return {
         sollTemp: 21.0, istTemp: 20.5 + Math.random(), offset: 0, reglerPercent: 20,
-        ventilatorState: 0, hauptbetriebsart: 'AUTOMATIK', betriebsart: 'KOMFORT',
+        ventilatorState: 0, betriebsart: 'KOMFORT',
         feuchte: 50, roomName: room?.name || "Demo-Raum", category: "DEMO"
       };
     }
@@ -201,6 +202,7 @@ class GekkoService {
     const vals = (itemData.sumstate?.value || itemData.sumstate || "").split(';');
     this.lastRawStatus = itemData.sumstate?.value || itemData.sumstate || "";
 
+    // Fix: Removed 'hauptbetriebsart' as it is not part of GekkoStatus interface
     return {
       istTemp: parseFloat(vals[0]) || 0,
       sollTemp: parseFloat(vals[1]) || 0,
@@ -209,7 +211,6 @@ class GekkoService {
       offset: parseFloat(vals[5]) || 0,
       feuchte: parseFloat(vals[8]) || 0,
       ventilatorState: 0, 
-      hauptbetriebsart: 'AUTOMATIK', 
       roomName: itemData.name || room?.name || roomId,
       category: itemData.page || "RÄUME"
     };

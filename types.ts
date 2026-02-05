@@ -25,7 +25,6 @@ export interface GekkoConfig {
   maxOffset: number; 
   stepSize: number;  
   lastUpdated: number;
-  // Neue Skin-Optionen
   skin: SkinType;
   customColor: string;
 }
@@ -36,7 +35,6 @@ export interface GekkoStatus {
   offset: number;
   reglerPercent: number;
   ventilatorState: number;
-  hauptbetriebsart: string;
   betriebsart: string;
   feuchte: number;
   roomName: string;

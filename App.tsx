@@ -49,14 +49,14 @@ const App: React.FC = () => {
         accent = "#0d1621";
         break;
       case 'sybtec':
-        primary = "#540d9e"; // Violett aus dem Logo
+        primary = "#540d9e"; 
         secondary = "#535353";
-        accent = "#7dbb26"; // Grün aus dem Logo
+        accent = "#7dbb26"; 
         break;
       case 'custom':
         primary = customColor;
         secondary = "#535353";
-        accent = customColor; // Kann optimiert werden
+        accent = customColor; 
         break;
       case 'tekko':
       default:
@@ -263,7 +263,7 @@ const App: React.FC = () => {
       <main className="flex-1 flex flex-col relative pb-4">
         {status && <MainControl soll={status.sollTemp} ist={status.istTemp} offset={status.offset} mode={status.betriebsart} onAdjust={handleTempAdjust} stepSize={Number(globalSettings.stepSize)} />}
         {status && <StatusLine regler={status.reglerPercent} ventilator={status.ventilatorState} />}
-        {status && <Footer hauptMode={status.hauptbetriebsart} subMode={status.betriebsart} feuchte={status.feuchte} />}
+        {status && <Footer subMode={status.betriebsart} feuchte={status.feuchte} />}
       </main>
     </div>
   );
