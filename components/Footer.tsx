@@ -1,3 +1,4 @@
+
 import React from 'react';
 
 interface FooterProps {
@@ -7,33 +8,36 @@ interface FooterProps {
 }
 
 const Footer: React.FC<FooterProps> = ({ hauptMode, subMode, feuchte }) => {
-  // Nur anzeigen, wenn Feuchte vorhanden und echt positiv (> 0)
-  // Viele Gekko-Systeme liefern 0 oder negative Werte, wenn kein Sensor installiert ist.
   const hasValidHumidity = feuchte > 0;
 
   return (
     <div className="mt-auto w-full">
-      {/* Main Footer Panel */}
-      <div className="bg-[#00828c] rounded-t-[3rem] p-10 pb-8 shadow-[0_-10px_25px_rgba(0,0,0,0.08)]">
+      <div 
+        className="rounded-t-[3rem] p-10 pb-8 shadow-[0_-10px_25px_rgba(0,0,0,0.08)]"
+        style={{backgroundColor: 'var(--color-primary)'}}
+      >
         <div className="max-w-md mx-auto space-y-5">
           
-          {/* Hauptbetriebsart */}
           <div className="flex justify-between items-center text-white">
             <span className="text-xs font-extralight uppercase tracking-widest opacity-80">Hauptbetriebsart</span>
-            <div className="bg-[#535353] px-6 py-2 rounded-[2px] min-w-[130px] text-xs font-normal tracking-wide shadow-sm uppercase text-center flex items-center justify-center">
+            <div 
+              className="px-6 py-2 rounded-[2px] min-w-[130px] text-xs font-normal tracking-wide shadow-sm uppercase text-center flex items-center justify-center"
+              style={{backgroundColor: 'var(--color-secondary)'}}
+            >
               {hauptMode}
             </div>
           </div>
 
-          {/* Betriebsart */}
           <div className="flex justify-between items-center text-white">
             <span className="text-xs font-extralight uppercase tracking-widest opacity-80">Betriebsart</span>
-            <div className="bg-[#006a72] px-6 py-2 rounded-[2px] min-w-[130px] text-xs font-normal tracking-wide border border-white/10 shadow-sm uppercase text-center flex items-center justify-center">
+            <div 
+              className="px-6 py-2 rounded-[2px] min-w-[130px] text-xs font-normal tracking-wide border border-white/10 shadow-sm uppercase text-center flex items-center justify-center"
+              style={{backgroundColor: 'var(--color-accent)'}}
+            >
               {subMode}
             </div>
           </div>
 
-          {/* Feuchte - Nur anzeigen wenn strikt > 0 */}
           {hasValidHumidity && (
             <div className="flex justify-between items-center text-white pt-2 border-t border-white/5">
               <span className="text-xs font-extralight uppercase tracking-widest opacity-80">Feuchte</span>
@@ -41,7 +45,6 @@ const Footer: React.FC<FooterProps> = ({ hauptMode, subMode, feuchte }) => {
             </div>
           )}
 
-          {/* Branding Link */}
           <div className="text-center pt-6 opacity-30 hover:opacity-100 transition-opacity">
             <a 
               href="https://www.sybtec.de" 

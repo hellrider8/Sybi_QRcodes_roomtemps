@@ -1,3 +1,4 @@
+
 import { GekkoStatus, GekkoConfig, RoomDefinition } from '../types.ts';
 
 export interface DiscoveryResult {
@@ -22,7 +23,10 @@ class GekkoService {
     minOffset: -3.0,
     maxOffset: 3.0,
     stepSize: 0.5,
-    lastUpdated: 0
+    lastUpdated: 0,
+    // Fix: Added missing skin and customColor properties to satisfy GekkoConfig interface
+    skin: 'tekko',
+    customColor: '#00828c'
   };
 
   private currentRoomId: string = '';

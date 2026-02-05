@@ -6,6 +6,8 @@ export interface RoomDefinition {
   category?: string; 
 }
 
+export type SkinType = 'tekko' | 'mygekko' | 'sybtec' | 'custom';
+
 export interface GekkoConfig {
   apiMode: 'local' | 'cloud';
   cloudProvider: 'gekko' | 'tekko';
@@ -22,8 +24,10 @@ export interface GekkoConfig {
   minOffset: number; 
   maxOffset: number; 
   stepSize: number;  
-  // The timestamp (in milliseconds) of when the configuration was last updated on the server.
   lastUpdated: number;
+  // Neue Skin-Optionen
+  skin: SkinType;
+  customColor: string;
 }
 
 export interface GekkoStatus {

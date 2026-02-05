@@ -1,3 +1,4 @@
+
 import React, { useState, useEffect } from 'react';
 import { ChevronLeft, LogOut, Globe, FlaskConical } from 'lucide-react';
 
@@ -28,14 +29,16 @@ const Header: React.FC<HeaderProps> = ({ roomName, category, onBack, showBack, i
   };
 
   const handleAction = (e: React.MouseEvent) => {
-    // Verhindert, dass der Klick nach oben zum Admin-Trigger (3-Sekunden-Hold) durchreicht
     e.stopPropagation(); 
     e.preventDefault();
     if (onBack) onBack();
   };
 
   return (
-    <header className="bg-[#00828c] text-white h-16 flex items-center px-4 shadow-md z-[70] relative overflow-hidden">
+    <header 
+      className="text-white h-16 flex items-center px-4 shadow-md z-[70] relative overflow-hidden"
+      style={{backgroundColor: 'var(--color-primary)'}}
+    >
       <div className="flex flex-col leading-tight absolute left-4 z-20 pointer-events-none">
         <span className="text-xl font-light tracking-tight">{formatTime(time)}</span>
         <span className="text-[10px] font-extralight opacity-80 uppercase tracking-wider">{formatDate(time)}</span>

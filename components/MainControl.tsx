@@ -15,8 +15,10 @@ const MainControl: React.FC<MainControlProps> = ({ soll, ist, offset, mode, onAd
 
   return (
     <div className="flex flex-col items-center justify-center py-10 scale-110 sm:scale-100">
-      <div className="bg-[#00828c] p-6 w-72 shadow-xl flex flex-col gap-4">
-        {/* Temperature Display Row */}
+      <div 
+        className="p-6 w-72 shadow-xl flex flex-col gap-4"
+        style={{backgroundColor: 'var(--color-primary)'}}
+      >
         <div className="space-y-4 px-1">
           <div className="flex justify-between items-baseline text-white">
             <span className="text-xs uppercase tracking-widest font-extralight opacity-80">Soll</span>
@@ -28,26 +30,30 @@ const MainControl: React.FC<MainControlProps> = ({ soll, ist, offset, mode, onAd
           </div>
         </div>
 
-        {/* Buttons Row */}
         <div className="flex items-stretch h-14 gap-1 mt-4">
           <button 
             onClick={() => !isBlocked && onAdjust(-stepSize)}
             disabled={isBlocked}
-            className={`flex-1 bg-[#535353] text-white flex items-center justify-center text-3xl font-extralight transition-all border-r border-teal-600/20 ${
-              isBlocked ? 'opacity-20 cursor-not-allowed grayscale' : 'hover:bg-[#404040] active:scale-95'
+            className={`flex-1 text-white flex items-center justify-center text-3xl font-extralight transition-all border-r border-black/10 ${
+              isBlocked ? 'opacity-20 cursor-not-allowed grayscale' : 'hover:brightness-90 active:scale-95'
             }`}
+            style={{backgroundColor: 'var(--color-secondary)'}}
           >
             —
           </button>
-          <div className={`w-24 bg-[#00828c] flex items-center justify-center border border-teal-500/50 text-white font-extralight text-base tracking-tighter transition-opacity ${isBlocked ? 'opacity-50' : 'opacity-100'}`}>
+          <div 
+            className={`w-24 flex items-center justify-center border border-white/20 text-white font-extralight text-base tracking-tighter transition-opacity ${isBlocked ? 'opacity-50' : 'opacity-100'}`}
+            style={{backgroundColor: 'var(--color-primary)'}}
+          >
             {offset > 0 ? '+' : ''}{offset.toFixed(1)} °C
           </div>
           <button 
             onClick={() => !isBlocked && onAdjust(stepSize)}
             disabled={isBlocked}
-            className={`flex-1 bg-[#535353] text-white flex items-center justify-center text-3xl font-extralight transition-all border-l border-teal-600/20 ${
-              isBlocked ? 'opacity-20 cursor-not-allowed grayscale' : 'hover:bg-[#404040] active:scale-95'
+            className={`flex-1 text-white flex items-center justify-center text-3xl font-extralight transition-all border-l border-black/10 ${
+              isBlocked ? 'opacity-20 cursor-not-allowed grayscale' : 'hover:brightness-90 active:scale-95'
             }`}
+            style={{backgroundColor: 'var(--color-secondary)'}}
           >
             +
           </button>
@@ -55,7 +61,7 @@ const MainControl: React.FC<MainControlProps> = ({ soll, ist, offset, mode, onAd
       </div>
       
       {isBlocked && (
-        <p className="text-[9px] text-[#00828c] uppercase tracking-widest mt-4 opacity-60 font-bold">
+        <p className="text-[9px] uppercase tracking-widest mt-4 opacity-60 font-bold" style={{color: 'var(--color-primary)'}}>
           Anpassung nur im Komfort-Modus möglich
         </p>
       )}

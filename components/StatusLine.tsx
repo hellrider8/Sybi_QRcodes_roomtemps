@@ -7,12 +7,6 @@ interface StatusLineProps {
 }
 
 const StatusLine: React.FC<StatusLineProps> = ({ regler, ventilator }) => {
-  // Präzise Berechnung der gefüllten Balken
-  // 0% -> 0
-  // 1-25% -> 1
-  // 26-50% -> 2
-  // 51-75% -> 3
-  // 76-100% -> 4
   const filledBars = regler === 0 ? 0 : Math.ceil(regler / 25);
 
   return (
@@ -29,8 +23,11 @@ const StatusLine: React.FC<StatusLineProps> = ({ regler, ventilator }) => {
             {[1, 2, 3, 4].map(i => (
               <div 
                 key={i} 
-                className={`w-[5px] rounded-t-[1.5px] transition-all duration-300 ${i <= filledBars ? 'bg-[#00828c]' : 'bg-gray-300/60'}`}
-                style={{ height: `${i * 25}%` }}
+                className={`w-[5px] rounded-t-[1.5px] transition-all duration-300 ${i <= filledBars ? '' : 'bg-gray-300/60'}`}
+                style={{ 
+                    height: `${i * 25}%`,
+                    backgroundColor: i <= filledBars ? 'var(--color-primary)' : undefined
+                }}
               />
             ))}
           </div>
