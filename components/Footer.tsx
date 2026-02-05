@@ -10,6 +10,24 @@ interface FooterProps {
 const Footer: React.FC<FooterProps> = ({ hauptMode, subMode, feuchte }) => {
   const hasValidHumidity = feuchte > 0;
 
+  // Logik für die Alarm-Farben (Rot bei Aus oder Hand)
+  const isHauptAlert = hauptMode.toUpperCase().includes('AUS') || hauptMode.toUpperCase().includes('HAND');
+  
+  // Die Hauptbetriebsart wird rot, wenn sie nicht im Automatik-Modus ist (laut Screenshots)
+  const hauptBg = isHauptAlert ? '#ef4444' : 'var(--color-secondary)';
+  
+  // Die Betriebsart (Sub-Modus) behält meistens die Akzentfarbe oder Grau
+  const subBg = isHauptAlert ? 'var(--color-secondary)' : 'var(--color-accent)';
+
+  // Formatierung der Labels für bessere Lesbarkeit (z.B. "HANDBETRIEB" statt "HAND")
+  const formatLabel = (label: string) => {
+    const l = label.toUpperCase();
+    if (l === 'AUTOMATIK') return 'AUTOMATIK';
+    if (l.includes('AUS')) return 'AUSGESCHALTET';
+    if (l.includes('HAND')) return 'HANDBETRIEB';
+    return l;
+  };
+
   return (
     <div className="mt-auto w-full">
       <div 
@@ -18,23 +36,25 @@ const Footer: React.FC<FooterProps> = ({ hauptMode, subMode, feuchte }) => {
       >
         <div className="max-w-md mx-auto space-y-5">
           
+          {/* Hauptbetriebsart */}
           <div className="flex justify-between items-center text-white">
             <span className="text-xs font-extralight uppercase tracking-widest opacity-80">Hauptbetriebsart</span>
             <div 
-              className="px-6 py-2 rounded-[2px] min-w-[130px] text-xs font-normal tracking-wide shadow-sm uppercase text-center flex items-center justify-center"
-              style={{backgroundColor: 'var(--color-secondary)'}}
+              className="px-6 py-2 rounded-[2px] min-w-[140px] text-xs font-bold tracking-wide shadow-md uppercase text-center flex items-center justify-center transition-colors duration-300"
+              style={{backgroundColor: hauptBg}}
             >
-              {hauptMode}
+              {formatLabel(hauptMode)}
             </div>
           </div>
 
+          {/* Betriebsart */}
           <div className="flex justify-between items-center text-white">
             <span className="text-xs font-extralight uppercase tracking-widest opacity-80">Betriebsart</span>
             <div 
-              className="px-6 py-2 rounded-[2px] min-w-[130px] text-xs font-normal tracking-wide border border-white/10 shadow-sm uppercase text-center flex items-center justify-center"
-              style={{backgroundColor: 'var(--color-accent)'}}
+              className="px-6 py-2 rounded-[2px] min-w-[140px] text-xs font-bold tracking-wide border border-white/10 shadow-sm uppercase text-center flex items-center justify-center transition-colors duration-300"
+              style={{backgroundColor: subBg}}
             >
-              {subMode}
+              {subMode.toUpperCase()}
             </div>
           </div>
 

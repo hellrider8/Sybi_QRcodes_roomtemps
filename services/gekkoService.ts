@@ -24,7 +24,6 @@ class GekkoService {
     maxOffset: 3.0,
     stepSize: 0.5,
     lastUpdated: 0,
-    // Fix: Added missing skin and customColor properties to satisfy GekkoConfig interface
     skin: 'tekko',
     customColor: '#00828c'
   };
@@ -159,10 +158,7 @@ class GekkoService {
         if (!item || typeof item !== 'object') return;
         const name = item.name || id;
         const stringId = String(id);
-        
-        // FILTER: Ignoriere alles mit GROUP in Name oder ID
         if (name.toUpperCase().includes('GROUP') || stringId.toUpperCase().includes('GROUP')) return;
-        
         rooms.push({ id: stringId, name, category: item.page || "RÄUME", enabled: true });
       };
       
@@ -180,38 +176,65 @@ class GekkoService {
   async fetchStatus(roomId: string = this.currentRoomId): Promise<GekkoStatus> {
     const room = this.config.rooms.find(r => r.id === roomId);
     if (this.config.useMock) {
+      // Simulation der Zustände für die UI-Tests
+      const mockState = Math.random();
+      let hMode = 'AUTOMATIK';
+      let bMode = 'KOMFORT';
+      let soll = 21.0;
+      let ist = 20.5 + Math.random();
+      let regler = 20;
+
+      if (mockState > 0.7) {
+        hMode = 'AUS';
+        bMode = 'AUS';
+        soll = 5.0;
+        regler = 0;
+      } else if (mockState > 0.4) {
+        hMode = 'HAND';
+        bMode = 'MANUELL';
+        soll = 30.0;
+        regler = 100;
+      }
+
       return {
-        sollTemp: 21.0, istTemp: 20.5 + Math.random(), offset: 0, reglerPercent: 20,
-        ventilatorState: 0, hauptbetriebsart: 'AUTOMATIK', betriebsart: 'KOMFORT',
-        feuchte: 50, roomName: room?.name || "Demo-Raum", category: "DEMO"
+        sollTemp: soll, istTemp: ist, offset: 0, reglerPercent: regler,
+        ventilatorState: 0, hauptbetriebsart: hMode, betriebsart: bMode,
+        feuchte: 30, roomName: room?.name || "Demo-Raum", category: "DEMO"
       };
     }
+
     const url = this.getUrl('/roomtemps/status');
     const response = await fetch(url, this.getFetchOptions());
     const allStatusData = await response.json();
     const itemData = allStatusData[roomId];
     if (!itemData) throw new Error(`Raum ${roomId} nicht im Datensatz`);
     const vals = (itemData.sumstate?.value || itemData.sumstate || "").split(';');
+    
+    // Mapping der echten Gekko-Werte
+    const subModeCode = parseInt(vals[3]);
+    let bMode = 'AUTOMATIK';
+    if (subModeCode === 8) bMode = 'KOMFORT';
+    else if (subModeCode === 16) bMode = 'ABSENKUNG';
+    else if (subModeCode === 64) bMode = 'MANUELL';
+    else if (subModeCode === 0) bMode = 'AUS';
+
+    // Bestimmung der Hauptbetriebsart basierend auf den Werten
+    let hMode = 'AUTOMATIK';
+    if (subModeCode === 0 || vals[1] === "5.00") hMode = 'AUS';
+    else if (subModeCode === 64) hMode = 'HAND';
+
     return {
       istTemp: parseFloat(vals[0]) || 0,
       sollTemp: parseFloat(vals[1]) || 0,
       reglerPercent: Math.round(parseFloat(vals[2])) || 0,
-      betriebsart: this.mapWorkingMode(vals[3]),
+      betriebsart: bMode,
       offset: parseFloat(vals[5]) || 0,
       feuchte: parseFloat(vals[8]) || 0,
       ventilatorState: 0, 
-      hauptbetriebsart: 'AUTOMATIK', 
+      hauptbetriebsart: hMode, 
       roomName: itemData.name || room?.name || roomId,
       category: itemData.page || "RÄUME"
     };
-  }
-
-  private mapWorkingMode(mode: string): string {
-    const m = parseInt(mode);
-    if (m === 8) return 'KOMFORT';
-    if (m === 16) return 'Absenk.';
-    if (m === 64) return 'MANUELL';
-    return 'AUTOMATIK';
   }
 
   async setAdjustment(newOffset: number, roomId: string = this.currentRoomId): Promise<boolean> {
