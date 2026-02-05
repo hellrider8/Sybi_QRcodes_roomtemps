@@ -1,3 +1,4 @@
+
 const express = require('express');
 const path = require('path');
 const cors = require('cors');
@@ -9,28 +10,31 @@ const { getFirestore } = require('firebase-admin/firestore');
 const app = express();
 const PORT = process.env.PORT || 8080;
 
+// Firebase Admin initialisieren
 try {
     if (!admin.apps.length) {
         admin.initializeApp();
     }
 } catch (e) {
-    console.error('[FIREBASE] Error:', e.message);
+    console.error('[FIREBASE] Initialisierungsfehler:', e.message);
 }
 
+// Zugriff auf die Firestore Standard-Datenbank
 let db;
 let configRef;
 
 try {
-    db = getFirestore('tekkoconfig');
-    configRef = db.collection('configs').doc('global');
-} catch (e) {
+    // Nutzt die Standard-Datenbank (default), die im Google Cloud Interface erstellt wird
     db = admin.firestore();
     configRef = db.collection('configs').doc('global');
+} catch (e) {
+    console.error('[FIREBASE] Firestore Verbindungsfehler:', e.message);
 }
 
 app.use(cors());
 app.use(express.json({ limit: '1mb' }));
 
+// Hilfsfunktion zum Bereinigen von Daten für Firestore
 function sanitize(obj) {
   if (Array.isArray(obj)) {
     return obj.map(v => sanitize(v));
@@ -63,21 +67,25 @@ const DEFAULT_CONFIG = {
 
 app.get('/api/config', async (req, res) => {
     try {
+        if (!configRef) return res.json(DEFAULT_CONFIG);
         const doc = await configRef.get();
         if (!doc.exists) return res.json(DEFAULT_CONFIG);
         res.json({ ...DEFAULT_CONFIG, ...doc.data() });
     } catch (err) {
+        console.error("Fehler beim Laden der Config:", err);
         res.json(DEFAULT_CONFIG);
     }
 });
 
 app.post('/api/config', async (req, res) => {
     try {
+        if (!configRef) throw new Error("Datenbank nicht initialisiert");
         const cleanData = sanitize(req.body);
         const newConfig = { ...cleanData, lastUpdated: Date.now() };
         await configRef.set(newConfig, { merge: true });
         res.json(newConfig);
     } catch (err) {
+        console.error("Fehler beim Speichern der Config:", err);
         res.status(500).json({ error: 'DB Error', details: err.message });
     }
 });
