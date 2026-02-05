@@ -13,7 +13,8 @@ interface AdminPanelProps {
 
 const AdminPanel: React.FC<AdminPanelProps> = ({ onClose, onPreviewRoom }) => {
   const [config, setConfig] = useState<GekkoConfig>(gekkoService.getConfig());
-  const [activeTab, setActiveTab] = useState<'api' | 'rooms' | 'skins' | 'export' | 'hosting'>('api');
+  // Tab-Reihenfolge geändert: skins ist nun am Ende
+  const [activeTab, setActiveTab] = useState<'api' | 'rooms' | 'export' | 'hosting' | 'skins'>('api');
   const [isTesting, setIsTesting] = useState(false);
   const [isDiscovering, setIsDiscovering] = useState(false);
   const [testResult, setTestResult] = useState<{success?: boolean, msg?: string}>({});
@@ -30,13 +31,36 @@ const AdminPanel: React.FC<AdminPanelProps> = ({ onClose, onPreviewRoom }) => {
 
   const applyPreviewColors = (skin: SkinType, customColor: string) => {
     let primary = "#00828c";
+    let secondary = "#535353";
+    let accent = "#006a72";
+
     switch (skin) {
-      case 'mygekko': primary = "#1a2533"; break;
-      case 'sybtec': primary = "#540d9e"; break;
-      case 'custom': primary = customColor; break;
-      case 'tekko': default: primary = "#00828c"; break;
+      case 'mygekko':
+        primary = "#1a2533";
+        secondary = "#3d4a5c";
+        accent = "#0d1621";
+        break;
+      case 'sybtec':
+        primary = "#540d9e"; // Violett
+        secondary = "#535353";
+        accent = "#7dbb26"; // Grün
+        break;
+      case 'custom':
+        primary = customColor;
+        secondary = "#535353";
+        accent = customColor;
+        break;
+      case 'tekko':
+      default:
+        primary = "#00828c";
+        secondary = "#535353";
+        accent = "#006a72";
+        break;
     }
+
     document.documentElement.style.setProperty('--color-primary', primary);
+    document.documentElement.style.setProperty('--color-secondary', secondary);
+    document.documentElement.style.setProperty('--color-accent', accent);
   };
 
   const handleSave = async () => {
@@ -129,11 +153,11 @@ const AdminPanel: React.FC<AdminPanelProps> = ({ onClose, onPreviewRoom }) => {
       </div>
 
       <div className="flex bg-slate-100 border-b overflow-x-auto scrollbar-hide">
-        {['api', 'rooms', 'skins', 'export', 'hosting'].map(tab => (
+        {['api', 'rooms', 'export', 'hosting', 'skins'].map(tab => (
           <button key={tab} onClick={() => setActiveTab(tab as any)} 
             className={`flex-1 min-w-[100px] py-4 text-[10px] font-bold uppercase tracking-wider transition-all ${activeTab === tab ? 'bg-white border-b-2 text-slate-900' : 'text-slate-500'}`}
             style={activeTab === tab ? {borderColor: 'var(--color-primary)', color: 'var(--color-primary)'} : {}}>
-            {tab === 'api' ? 'Verbindung' : tab === 'rooms' ? 'Räume' : tab === 'skins' ? 'Skin' : tab === 'export' ? 'QR-Codes' : 'Regeln'}
+            {tab === 'api' ? 'Verbindung' : tab === 'rooms' ? 'Räume' : tab === 'export' ? 'QR-Codes' : tab === 'hosting' ? 'Regeln' : 'Skin'}
           </button>
         ))}
       </div>
