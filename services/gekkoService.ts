@@ -154,18 +154,10 @@ class GekkoService {
       const items = rawData.roomtemps || rawData;
       const rooms: RoomDefinition[] = [];
       
-      const processItem = (id: string, item: any) => {
-        if (!item || typeof item !== 'object') return;
-        const name = item.name || id;
-        const stringId = String(id);
-        if (name.toUpperCase().includes('GROUP') || stringId.toUpperCase().includes('GROUP')) return;
-        rooms.push({ id: stringId, name, category: item.page || "RÄUME", enabled: true });
-      };
-      
-      if (Array.isArray(items)) {
-        items.forEach((it: any) => it?.id && processItem(it.id, it));
-      } else {
-        for (const k in items) if (!k.startsWith('_')) processItem(k, items[k]);
+      for (const k in items) {
+        if (k.startsWith('_')) continue;
+        const it = items[k];
+        rooms.push({ id: k, name: it.name || k, category: it.page || "RÄUME", enabled: true });
       }
       return { rooms, rawData, debugInfo: "Import erfolgreich" };
     } catch (e: any) {
@@ -182,15 +174,15 @@ class GekkoService {
       let ist = 20.5 + Math.random();
       let regler = 20;
 
-      if (mockState > 0.75) {
+      if (mockState > 0.8) {
         bMode = 'AUS';
         soll = 5.0;
         regler = 0;
-      } else if (mockState > 0.5) {
+      } else if (mockState > 0.6) {
         bMode = 'HAND';
         soll = 30.0;
         regler = 100;
-      } else if (mockState > 0.25) {
+      } else if (mockState > 0.4) {
         bMode = 'ABSENK';
         soll = 17.0;
         regler = 5;
@@ -210,10 +202,9 @@ class GekkoService {
     if (!itemData) throw new Error(`Raum ${roomId} nicht im Datensatz`);
     const vals = (itemData.sumstate?.value || itemData.sumstate || "").split(';');
     
-    // Mapping der Betriebsart basierend auf workingMode (index 3)
-    // 1=off, 8=comfort, 16=reduced, 64=manual
+    // Mapping 1=AUS, 8=KOMFORT, 16=ABSENK, 64=HAND
     const workingModeCode = parseInt(vals[3]);
-    let bMode = 'KOMFORT'; // Default
+    let bMode = 'KOMFORT';
     if (workingModeCode === 1) bMode = 'AUS';
     else if (workingModeCode === 8) bMode = 'KOMFORT';
     else if (workingModeCode === 16) bMode = 'ABSENK';

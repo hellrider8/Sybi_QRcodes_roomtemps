@@ -27,6 +27,7 @@ const App: React.FC = () => {
   const [optimisticOffset, setOptimisticOffset] = useState<number | null>(null);
   const lastClickTime = useRef<number>(0);
   const pressTimer = useRef<number | null>(null);
+  const isInitializing = useRef<boolean>(true);
 
   const [globalSettings, setGlobalSettings] = useState({
     sessionDurationMinutes: 15,
@@ -87,7 +88,7 @@ const App: React.FC = () => {
   };
 
   const checkExpiry = useCallback(() => {
-    if (showAdmin || isPreview) return;
+    if (showAdmin || isPreview || isInitializing.current) return;
     
     const sessionStartStr = localStorage.getItem('gekko_session_start');
     if (!sessionStartStr) {
@@ -100,7 +101,11 @@ const App: React.FC = () => {
 
     const sessionStart = parseInt(sessionStartStr);
     const elapsedMs = Date.now() - sessionStart;
-    const limitMs = globalSettings.sessionDurationMinutes * 60 * 1000;
+    
+    // Kleiner Puffer von 10 Sekunden für gerade gestartete Sitzungen
+    if (elapsedMs < 10000) return;
+
+    const limitMs = (globalSettings.sessionDurationMinutes || 15) * 60 * 1000;
     
     if (elapsedMs > limitMs) {
       setIsExpired(true);
@@ -148,6 +153,7 @@ const App: React.FC = () => {
 
   useEffect(() => {
     const init = async () => {
+      isInitializing.current = true;
       const params = new URLSearchParams(window.location.search);
       const token = params.get('t');
       const roomIdDirect = params.get('room');
@@ -170,15 +176,25 @@ const App: React.FC = () => {
       } else if (roomIdDirect) {
         setCurrentRoomId(roomIdDirect);
         gekkoService.setCurrentRoom(roomIdDirect);
-        checkExpiry();
+        // Bei direktem Room-Zugriff prüfen wir die Session aus dem Storage
+        const start = localStorage.getItem('gekko_session_start');
+        if (!start) {
+            setIsExpired(true);
+            setExpiryReason("Sitzung abgelaufen");
+        }
       } else {
         setIsExpired(true);
         setExpiryReason("Bitte QR-Code scannen");
       }
+      
       setLoading(false);
+      // Verzögerung der Ablaufprüfung um 2 Sekunden nach Init
+      setTimeout(() => {
+        isInitializing.current = false;
+      }, 2000);
     };
     init();
-  }, [checkExpiry]);
+  }, []);
 
   useEffect(() => {
     if (!loading && !isExpired && !showAdmin && !isPreview) {
@@ -237,7 +253,7 @@ const App: React.FC = () => {
     }
   }, [refreshData, currentRoomId, showAdmin, loading, isExpired]);
 
-  if (loading) return <div className="min-h-screen flex items-center justify-center bg-[#e0e4e7]"><div className="w-10 h-10 border-4 border-[#00828c] border-t-transparent rounded-full animate-spin"></div></div>;
+  if (loading) return null; // Der Spinner kommt jetzt direkt aus der index.html
   
   if (showAdmin) return <AdminPanel onClose={async () => { await loadGlobalConfig(); setShowAdmin(false); }} onPreviewRoom={(id) => { setIsPreview(true); setCurrentRoomId(id); gekkoService.setCurrentRoom(id); setShowAdmin(false); }} />;
   
